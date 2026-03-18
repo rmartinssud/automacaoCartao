@@ -139,6 +139,36 @@
           <label><input id="onlyName" type="checkbox" /> Usar somente nome (última linha)</label>
         </div>
       </div>
+
+      <div class="grid3">
+        <div class="row">
+          <label for="titleTextAlign">Alinhamento do título</label>
+          <select id="titleTextAlign">
+            <option value="left" selected>Esquerda</option>
+            <option value="center">Centro</option>
+            <option value="right">Direita</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="bodyTextAlign">Alinhamento do texto principal</label>
+          <select id="bodyTextAlign">
+            <option value="left" selected>Esquerda</option>
+            <option value="center">Centro</option>
+            <option value="right">Direita</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="headerContentGapMm">Espaço entre cabeçalho e conteúdo (mm)</label>
+          <input id="headerContentGapMm" type="number" value="0" step="0.5" min="0" max="100" />
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="row">
+          <label for="footerContentGapMm">Espaço entre conteúdo e rodapé (mm)</label>
+          <input id="footerContentGapMm" type="number" value="0" step="0.5" min="0" max="100" />
+        </div>
+      </div>
     </fieldset>
 
     <fieldset>
@@ -162,6 +192,33 @@
             <option value="left">Esquerda</option>
             <option value="center" selected>Centro</option>
             <option value="right">Direita</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="headerImageBoxWidthMm">Largura do espaço da imagem (mm) (cabeçalho)</label>
+          <input id="headerImageBoxWidthMm" type="number" value="0" step="0.5" min="0" max="300" />
+        </div>
+        <div class="row">
+          <label for="headerImageBoxHeightMm">Altura do espaço da imagem (mm) (cabeçalho)</label>
+          <input id="headerImageBoxHeightMm" type="number" value="0" step="0.5" min="0" max="300" />
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="row">
+          <label for="headerImageAlignX">Alinhamento horizontal da imagem (cabeçalho)</label>
+          <select id="headerImageAlignX">
+            <option value="left">Esquerda</option>
+            <option value="center" selected>Centro</option>
+            <option value="right">Direita</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="headerImageAlignY">Alinhamento vertical da imagem (cabeçalho)</label>
+          <select id="headerImageAlignY">
+            <option value="top">Topo</option>
+            <option value="middle" selected>Meio</option>
+            <option value="bottom">Base</option>
           </select>
         </div>
         <div class="row">
@@ -217,6 +274,33 @@
           </select>
         </div>
         <div class="row">
+          <label for="footerImageBoxWidthMm">Largura do espaço da imagem (mm) (rodapé)</label>
+          <input id="footerImageBoxWidthMm" type="number" value="0" step="0.5" min="0" max="300" />
+        </div>
+        <div class="row">
+          <label for="footerImageBoxHeightMm">Altura do espaço da imagem (mm) (rodapé)</label>
+          <input id="footerImageBoxHeightMm" type="number" value="0" step="0.5" min="0" max="300" />
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="row">
+          <label for="footerImageAlignX">Alinhamento horizontal da imagem (rodapé)</label>
+          <select id="footerImageAlignX">
+            <option value="left">Esquerda</option>
+            <option value="center" selected>Centro</option>
+            <option value="right">Direita</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="footerImageAlignY">Alinhamento vertical da imagem (rodapé)</label>
+          <select id="footerImageAlignY">
+            <option value="top">Topo</option>
+            <option value="middle" selected>Meio</option>
+            <option value="bottom">Base</option>
+          </select>
+        </div>
+        <div class="row">
           <label for="footerFontSizePt">Tamanho da fonte (pt) (rodapé)</label>
           <input id="footerFontSizePt" type="number" value="10" step="1" min="6" max="72" />
         </div>
@@ -262,7 +346,13 @@
 
     <div class="row inline">
       <button id="generateBtn">Gerar</button>
+      <button id="previewBtn">Gerar exemplo</button>
       <div id="status"></div>
+    </div>
+
+    <div class="row">
+      <progress id="progressBar" value="0" max="100" style="width: 100%"></progress>
+      <div id="progressText"></div>
     </div>
 
     <div id="result" class="row"></div>
@@ -285,11 +375,19 @@
       const marginMm = el("marginMm");
       const titleFontSizePt = el("titleFontSizePt");
       const titleFontStyle = el("titleFontStyle");
+      const titleTextAlign = el("titleTextAlign");
+      const bodyTextAlign = el("bodyTextAlign");
+      const headerContentGapMm = el("headerContentGapMm");
+      const footerContentGapMm = el("footerContentGapMm");
       const headerEnabled = el("headerEnabled");
       const headerLeftImage = el("headerLeftImage");
       const headerRightImage = el("headerRightImage");
       const headerTextTemplate = el("headerTextTemplate");
       const headerTextAlign = el("headerTextAlign");
+      const headerImageBoxWidthMm = el("headerImageBoxWidthMm");
+      const headerImageBoxHeightMm = el("headerImageBoxHeightMm");
+      const headerImageAlignX = el("headerImageAlignX");
+      const headerImageAlignY = el("headerImageAlignY");
       const headerFontSizePt = el("headerFontSizePt");
       const headerFontStyle = el("headerFontStyle");
       const headerLineHeight = el("headerLineHeight");
@@ -298,6 +396,10 @@
       const footerRightImage = el("footerRightImage");
       const footerTextTemplate = el("footerTextTemplate");
       const footerTextAlign = el("footerTextAlign");
+      const footerImageBoxWidthMm = el("footerImageBoxWidthMm");
+      const footerImageBoxHeightMm = el("footerImageBoxHeightMm");
+      const footerImageAlignX = el("footerImageAlignX");
+      const footerImageAlignY = el("footerImageAlignY");
       const footerFontSizePt = el("footerFontSizePt");
       const footerFontStyle = el("footerFontStyle");
       const footerLineHeight = el("footerLineHeight");
@@ -306,8 +408,11 @@
       const removals = el("removals");
       const bodyTemplate = el("bodyTemplate");
       const status = el("status");
+      const progressBar = el("progressBar");
+      const progressText = el("progressText");
       const result = el("result");
       const generateBtn = el("generateBtn");
+      const previewBtn = el("previewBtn");
 
       let headerLeftImageDataUrl = "";
       let headerRightImageDataUrl = "";
@@ -371,78 +476,153 @@
         }
       }
 
-      async function generate() {
+      function sleep(ms) {
+        return new Promise((r) => setTimeout(r, ms));
+      }
+
+      function setBusy(isBusy) {
+        generateBtn.disabled = isBusy;
+        previewBtn.disabled = isBusy;
+      }
+
+      function buildPayload(mode) {
+        const removalLines = (removals.value || "")
+          .split(/\r?\n/g)
+          .map((l) => l.trim())
+          .filter(Boolean);
+
+        const outputName =
+          mode === "preview"
+            ? (outputFile.value.toLowerCase().startsWith("preview-")
+                ? outputFile.value
+                : `preview-${outputFile.value}`)
+            : outputFile.value;
+
+        return {
+          mode,
+          inputFile: inputFile.value,
+          outputFile: outputName,
+          preset: preset.value,
+          widthMm: Number(widthMm.value),
+          heightMm: Number(heightMm.value),
+          marginMm: Number(marginMm.value),
+          titleFontSizePt: Number(titleFontSizePt.value),
+          titleFontStyle: titleFontStyle.value,
+          titleTextAlign: titleTextAlign.value,
+          bodyTextAlign: bodyTextAlign.value,
+          headerContentGapMm: Number(headerContentGapMm.value),
+          footerContentGapMm: Number(footerContentGapMm.value),
+          headerEnabled: Boolean(headerEnabled.checked),
+          headerImageBoxWidthMm: Number(headerImageBoxWidthMm.value),
+          headerImageBoxHeightMm: Number(headerImageBoxHeightMm.value),
+          headerImageAlignX: headerImageAlignX.value,
+          headerImageAlignY: headerImageAlignY.value,
+          headerLeftImageDataUrl,
+          headerRightImageDataUrl,
+          headerTextTemplate: headerTextTemplate.value || "",
+          headerTextAlign: headerTextAlign.value,
+          headerFontSizePt: Number(headerFontSizePt.value),
+          headerFontStyle: headerFontStyle.value,
+          headerLineHeight: Number(headerLineHeight.value),
+          footerEnabled: Boolean(footerEnabled.checked),
+          footerImageBoxWidthMm: Number(footerImageBoxWidthMm.value),
+          footerImageBoxHeightMm: Number(footerImageBoxHeightMm.value),
+          footerImageAlignX: footerImageAlignX.value,
+          footerImageAlignY: footerImageAlignY.value,
+          footerLeftImageDataUrl,
+          footerRightImageDataUrl,
+          footerTextTemplate: footerTextTemplate.value || "",
+          footerTextAlign: footerTextAlign.value,
+          footerFontSizePt: Number(footerFontSizePt.value),
+          footerFontStyle: footerFontStyle.value,
+          footerLineHeight: Number(footerLineHeight.value),
+          bodyTemplate: bodyTemplate.value || "",
+          removals: removalLines,
+          onlyName: Boolean(onlyName.checked),
+          includeTitle: Boolean(includeTitle.checked),
+        };
+      }
+
+      async function readJsonOrTextError(r, fallbackMessage) {
+        const contentType = (r.headers.get("content-type") || "").toLowerCase();
+        if (contentType.includes("application/json")) return await r.json();
+        const text = await r.text();
+        const hint =
+          "O servidor provavelmente não está atualizado (endpoint /api/job) ou a página não foi aberta pela interface.\n" +
+          "Rodar: npm run ui e abrir a URL exibida no terminal.";
+        throw new Error(
+          `${fallbackMessage} (HTTP ${r.status}).\n\n${hint}\n\nResposta:\n${String(text).slice(0, 300)}`,
+        );
+      }
+
+      async function runJob(mode) {
         result.textContent = "";
-        status.textContent = "Gerar...";
-        generateBtn.disabled = true;
+        status.textContent = mode === "preview" ? "Gerar exemplo..." : "Gerar...";
+        progressBar.value = 0;
+        progressText.textContent = "";
+        setBusy(true);
         try {
-          const removalLines = (removals.value || "")
-            .split(/\r?\n/g)
-            .map((l) => l.trim())
-            .filter(Boolean);
+          const payload = buildPayload(mode);
 
-          const payload = {
-            inputFile: inputFile.value,
-            outputFile: outputFile.value,
-            preset: preset.value,
-            widthMm: Number(widthMm.value),
-            heightMm: Number(heightMm.value),
-            marginMm: Number(marginMm.value),
-            titleFontSizePt: Number(titleFontSizePt.value),
-            titleFontStyle: titleFontStyle.value,
-            headerEnabled: Boolean(headerEnabled.checked),
-            headerLeftImageDataUrl,
-            headerRightImageDataUrl,
-            headerTextTemplate: headerTextTemplate.value || "",
-            headerTextAlign: headerTextAlign.value,
-            headerFontSizePt: Number(headerFontSizePt.value),
-            headerFontStyle: headerFontStyle.value,
-            headerLineHeight: Number(headerLineHeight.value),
-            footerEnabled: Boolean(footerEnabled.checked),
-            footerLeftImageDataUrl,
-            footerRightImageDataUrl,
-            footerTextTemplate: footerTextTemplate.value || "",
-            footerTextAlign: footerTextAlign.value,
-            footerFontSizePt: Number(footerFontSizePt.value),
-            footerFontStyle: footerFontStyle.value,
-            footerLineHeight: Number(footerLineHeight.value),
-            bodyTemplate: bodyTemplate.value || "",
-            removals: removalLines,
-            onlyName: Boolean(onlyName.checked),
-            includeTitle: Boolean(includeTitle.checked),
-          };
-
-          const r = await fetch("/api/generate", {
+          const r = await fetch("/api/job", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
 
-          const data = await r.json();
-          if (!r.ok) throw new Error(data.error || "Erro ao gerar.");
+          const data = await readJsonOrTextError(r, "Falhar ao iniciar geração");
+          if (!r.ok) throw new Error(data.error || `Falhar ao iniciar geração (HTTP ${r.status}).`);
 
-          const a = document.createElement("a");
-          a.href = data.downloadUrl;
-          a.textContent = "Baixar PDF";
+          const jobId = data.jobId;
+          if (!jobId) throw new Error("Job não iniciar.");
 
-          result.innerHTML =
-            "<div><strong>Gerar concluído</strong></div>" +
-            `<div>Total encontrado: ${data.stats.totalTitlesFound}</div>` +
-            `<div>Gerado: ${data.stats.uniqueCardsGenerated}</div>` +
-            `<div>Repetidos removidos: ${data.stats.duplicatesRemoved}</div>`;
-          result.appendChild(document.createElement("div")).appendChild(a);
-          status.textContent = "";
+          while (true) {
+            const jr = await fetch(`/api/job/${encodeURIComponent(jobId)}`);
+            const job = await readJsonOrTextError(jr, "Falhar ao checar progresso");
+            if (!jr.ok) throw new Error(job.error || `Falhar ao checar progresso (HTTP ${jr.status}).`);
+
+            progressBar.value = Number(job.percent || 0);
+            progressText.textContent = job.message || "";
+
+            if (job.status === "done") {
+              const a = document.createElement("a");
+              a.href = job.result.downloadUrl;
+              a.textContent = "Baixar PDF";
+
+              result.innerHTML =
+                "<div><strong>Gerar concluído</strong></div>" +
+                `<div>Arquivo: ${job.result.outputFile}</div>` +
+                `<div>Total encontrado: ${job.result.stats.totalTitlesFound}</div>` +
+                `<div>Gerado: ${job.result.stats.uniqueCardsGenerated}</div>` +
+                `<div>Repetidos removidos: ${job.result.stats.duplicatesRemoved}</div>`;
+              result.appendChild(document.createElement("div")).appendChild(a);
+              status.textContent = "";
+              break;
+            }
+
+            if (job.status === "error") {
+              throw new Error(job.error || "Erro ao gerar.");
+            }
+
+            await sleep(500);
+          }
         } catch (e) {
           status.textContent = "";
+          progressText.textContent = "";
           result.textContent = e instanceof Error ? e.message : String(e);
         } finally {
-          generateBtn.disabled = false;
+          setBusy(false);
         }
       }
 
       generateBtn.addEventListener("click", (ev) => {
         ev.preventDefault();
-        generate();
+        runJob("full");
+      });
+
+      previewBtn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        runJob("preview");
       });
 
       removals.value = "EXMO. SENHOR ACADÊMICO\nPROFESSOR DOUTOR";
@@ -451,6 +631,18 @@
       bodyTemplate.value = defaultBody;
       setPreset(preset.value);
       loadInputs();
+      fetch("/api/health")
+        .then((r) => r.json())
+        .then((h) => {
+          if (!h || h.hasJob !== true) {
+            result.textContent =
+              "Servidor não está atualizado para suportar jobs (/api/job). Rodar: npm run ui e abrir a URL do terminal.";
+          }
+        })
+        .catch(() => {
+          result.textContent =
+            "Servidor não está atualizado para suportar jobs (/api/job). Rodar: npm run ui e abrir a URL do terminal.";
+        });
     </script>
   </body>
 </html>

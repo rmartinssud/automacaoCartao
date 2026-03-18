@@ -1,7 +1,8 @@
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
-import type { generatePdf as generatePdfType } from "./gerar-cartoes.js";
+import { randomUUID } from "node:crypto";
+import type { GenerateOptions, generatePdf as generatePdfType, ProgressUpdate } from "./gerar-cartoes.js";
 
 type GenerateRequest = {
   inputFile: string;
@@ -11,7 +12,14 @@ type GenerateRequest = {
   marginMm?: number;
   titleFontSizePt?: number;
   titleFontStyle?: "normal" | "bold" | "italic" | "bold_italic";
+  titleTextAlign?: "left" | "center" | "right";
+  bodyTextAlign?: "left" | "center" | "right";
+  headerContentGapMm?: number;
   headerEnabled?: boolean;
+  headerImageBoxWidthMm?: number;
+  headerImageBoxHeightMm?: number;
+  headerImageAlignX?: "left" | "center" | "right";
+  headerImageAlignY?: "top" | "middle" | "bottom";
   headerLeftImageDataUrl?: string;
   headerRightImageDataUrl?: string;
   headerTextTemplate?: string;
@@ -19,7 +27,12 @@ type GenerateRequest = {
   headerFontSizePt?: number;
   headerFontStyle?: "normal" | "bold" | "italic" | "bold_italic";
   headerLineHeight?: number;
+  footerContentGapMm?: number;
   footerEnabled?: boolean;
+  footerImageBoxWidthMm?: number;
+  footerImageBoxHeightMm?: number;
+  footerImageAlignX?: "left" | "center" | "right";
+  footerImageAlignY?: "top" | "middle" | "bottom";
   footerLeftImageDataUrl?: string;
   footerRightImageDataUrl?: string;
   footerTextTemplate?: string;
@@ -32,6 +45,7 @@ type GenerateRequest = {
   removals: string[];
   onlyName: boolean;
   includeTitle: boolean;
+  mode?: "preview" | "full";
 };
 
 function isSimpleFileName(value: string) {
@@ -56,11 +70,173 @@ async function getGeneratePdf() {
   return generatePdf;
 }
 
+function buildGenerateOptions(rootDir: string, payload: GenerateRequest, modeOverride?: "preview" | "full") {
+  if (!payload || typeof payload !== "object") throw new Error("Payload inválido.");
+  if (!isSimpleFileName(payload.inputFile) || !payload.inputFile.toLowerCase().endsWith(".txt")) {
+    throw new Error("Arquivo de entrada inválido.");
+  }
+  if (!isSimpleFileName(payload.outputFile) || !payload.outputFile.toLowerCase().endsWith(".pdf")) {
+    throw new Error("Arquivo de saída inválido.");
+  }
+
+  const inputPath = path.resolve(rootDir, payload.inputFile);
+  if (!fs.existsSync(inputPath)) throw new Error("Arquivo de entrada não existir.");
+
+  const preset = payload.preset ?? "cartao";
+  const widthMm = payload.widthMm ?? (preset === "a4" ? 210 : 156);
+  const heightMm = payload.heightMm ?? (preset === "a4" ? 297 : 110);
+  const marginMm = payload.marginMm ?? (preset === "a4" ? 20 : 8);
+
+  const outputPath = path.resolve(rootDir, payload.outputFile);
+
+  const titleFontSizePtRaw = payload.titleFontSizePt ?? 14;
+  const titleFontSizePt =
+    Number.isFinite(titleFontSizePtRaw) && titleFontSizePtRaw >= 6 && titleFontSizePtRaw <= 72 ? titleFontSizePtRaw : 14;
+
+  const titleFontStyle = payload.titleFontStyle ?? "bold";
+  const titleFontWeight = titleFontStyle === "bold" || titleFontStyle === "bold_italic" ? 700 : "normal";
+  const titleFontStyleCss = titleFontStyle === "italic" || titleFontStyle === "bold_italic" ? "italic" : "normal";
+
+  const headerEnabled = Boolean(payload.headerEnabled);
+  const footerEnabled = Boolean(payload.footerEnabled);
+
+  const headerTextAlign = payload.headerTextAlign ?? "center";
+  const footerTextAlign = payload.footerTextAlign ?? "center";
+
+  const titleTextAlign = payload.titleTextAlign ?? "left";
+  const bodyTextAlign = payload.bodyTextAlign ?? "left";
+
+  const headerContentGapMmRaw = payload.headerContentGapMm ?? 0;
+  const headerContentGapMm =
+    Number.isFinite(headerContentGapMmRaw) && headerContentGapMmRaw >= 0 && headerContentGapMmRaw <= 100
+      ? headerContentGapMmRaw
+      : 0;
+
+  const footerContentGapMmRaw = payload.footerContentGapMm ?? 0;
+  const footerContentGapMm =
+    Number.isFinite(footerContentGapMmRaw) && footerContentGapMmRaw >= 0 && footerContentGapMmRaw <= 100
+      ? footerContentGapMmRaw
+      : 0;
+
+  const headerImageBoxWidthMmRaw = payload.headerImageBoxWidthMm ?? 0;
+  const headerImageBoxWidthMm =
+    Number.isFinite(headerImageBoxWidthMmRaw) && headerImageBoxWidthMmRaw >= 0 && headerImageBoxWidthMmRaw <= 300
+      ? headerImageBoxWidthMmRaw
+      : 0;
+
+  const headerImageBoxHeightMmRaw = payload.headerImageBoxHeightMm ?? 0;
+  const headerImageBoxHeightMm =
+    Number.isFinite(headerImageBoxHeightMmRaw) && headerImageBoxHeightMmRaw >= 0 && headerImageBoxHeightMmRaw <= 300
+      ? headerImageBoxHeightMmRaw
+      : 0;
+
+  const headerImageAlignX = payload.headerImageAlignX ?? "center";
+  const headerImageAlignY = payload.headerImageAlignY ?? "middle";
+
+  const footerImageBoxWidthMmRaw = payload.footerImageBoxWidthMm ?? 0;
+  const footerImageBoxWidthMm =
+    Number.isFinite(footerImageBoxWidthMmRaw) && footerImageBoxWidthMmRaw >= 0 && footerImageBoxWidthMmRaw <= 300
+      ? footerImageBoxWidthMmRaw
+      : 0;
+
+  const footerImageBoxHeightMmRaw = payload.footerImageBoxHeightMm ?? 0;
+  const footerImageBoxHeightMm =
+    Number.isFinite(footerImageBoxHeightMmRaw) && footerImageBoxHeightMmRaw >= 0 && footerImageBoxHeightMmRaw <= 300
+      ? footerImageBoxHeightMmRaw
+      : 0;
+
+  const footerImageAlignX = payload.footerImageAlignX ?? "center";
+  const footerImageAlignY = payload.footerImageAlignY ?? "middle";
+
+  const headerFontSizePtRaw = payload.headerFontSizePt ?? 10;
+  const headerFontSizePt =
+    Number.isFinite(headerFontSizePtRaw) && headerFontSizePtRaw >= 6 && headerFontSizePtRaw <= 72 ? headerFontSizePtRaw : 10;
+
+  const footerFontSizePtRaw = payload.footerFontSizePt ?? 10;
+  const footerFontSizePt =
+    Number.isFinite(footerFontSizePtRaw) && footerFontSizePtRaw >= 6 && footerFontSizePtRaw <= 72 ? footerFontSizePtRaw : 10;
+
+  const headerLineHeightRaw = payload.headerLineHeight ?? 1.2;
+  const headerLineHeight =
+    Number.isFinite(headerLineHeightRaw) && headerLineHeightRaw >= 0.8 && headerLineHeightRaw <= 3 ? headerLineHeightRaw : 1.2;
+
+  const footerLineHeightRaw = payload.footerLineHeight ?? 1.2;
+  const footerLineHeight =
+    Number.isFinite(footerLineHeightRaw) && footerLineHeightRaw >= 0.8 && footerLineHeightRaw <= 3 ? footerLineHeightRaw : 1.2;
+
+  const headerFontStyle = payload.headerFontStyle ?? "normal";
+  const headerFontWeight = headerFontStyle === "bold" || headerFontStyle === "bold_italic" ? 700 : "normal";
+  const headerFontStyleCss = headerFontStyle === "italic" || headerFontStyle === "bold_italic" ? "italic" : "normal";
+
+  const footerFontStyle = payload.footerFontStyle ?? "normal";
+  const footerFontWeight = footerFontStyle === "bold" || footerFontStyle === "bold_italic" ? 700 : "normal";
+  const footerFontStyleCss = footerFontStyle === "italic" || footerFontStyle === "bold_italic" ? "italic" : "normal";
+
+  const mode = modeOverride ?? payload.mode ?? "full";
+  const limit = mode === "preview" ? 1 : undefined;
+
+  const options: GenerateOptions = {
+    inputPath,
+    outputPath,
+    widthMm,
+    heightMm,
+    marginMm,
+    titleFontSizePt,
+    titleFontWeight,
+    titleFontStyle: titleFontStyleCss,
+    titleTextAlign,
+    bodyTextAlign,
+    headerContentGapMm,
+    headerEnabled,
+    headerImageBoxWidthMm,
+    headerImageBoxHeightMm,
+    headerImageAlignX,
+    headerImageAlignY,
+    headerLeftImageDataUrl: payload.headerLeftImageDataUrl ?? "",
+    headerRightImageDataUrl: payload.headerRightImageDataUrl ?? "",
+    headerTextTemplate: payload.headerTextTemplate ?? "",
+    headerTextAlign,
+    headerFontSizePt,
+    headerFontWeight,
+    headerFontStyle: headerFontStyleCss,
+    headerLineHeight,
+    footerContentGapMm,
+    footerEnabled,
+    footerImageBoxWidthMm,
+    footerImageBoxHeightMm,
+    footerImageAlignX,
+    footerImageAlignY,
+    footerLeftImageDataUrl: payload.footerLeftImageDataUrl ?? "",
+    footerRightImageDataUrl: payload.footerRightImageDataUrl ?? "",
+    footerTextTemplate: payload.footerTextTemplate ?? "",
+    footerTextAlign,
+    footerFontSizePt,
+    footerFontWeight,
+    footerFontStyle: footerFontStyleCss,
+    footerLineHeight,
+    bodyTemplate: payload.bodyTemplate ?? "",
+    removals: Array.isArray(payload.removals) ? payload.removals : [],
+    onlyName: Boolean(payload.onlyName),
+    includeTitle: Boolean(payload.includeTitle),
+    limit,
+  };
+
+  return { options, outputFile: payload.outputFile };
+}
+
 async function main() {
   const app = express();
   const rootDir = process.cwd();
 
-  app.use(express.json({ limit: "25mb" }));
+  app.use(express.json({ limit: "50mb" }));
+
+  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err && err.type === "entity.too.large") {
+      res.status(413).json({ error: "Imagens grandes demais. Tentar reduzir ou usar arquivos menores." });
+      return;
+    }
+    next(err);
+  });
 
   app.get("/", (_req, res) => {
     res.sendFile(path.resolve(rootDir, "ui.html"));
@@ -70,128 +246,101 @@ async function main() {
     res.json({ files: listTxtFiles(rootDir) });
   });
 
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      ok: true,
+      hasJob: true,
+      endpoints: ["/api/health", "/api/inputs", "/api/job", "/api/job/:id", "/download/:file"],
+    });
+  });
+
   app.post("/api/generate", async (req, res) => {
     try {
       const payload = req.body as GenerateRequest;
-
-      if (!payload || typeof payload !== "object") {
-        res.status(400).json({ error: "Payload inválido." });
-        return;
-      }
-
-      if (!isSimpleFileName(payload.inputFile) || !payload.inputFile.toLowerCase().endsWith(".txt")) {
-        res.status(400).json({ error: "Arquivo de entrada inválido." });
-        return;
-      }
-
-      if (!isSimpleFileName(payload.outputFile) || !payload.outputFile.toLowerCase().endsWith(".pdf")) {
-        res.status(400).json({ error: "Arquivo de saída inválido." });
-        return;
-      }
-
-      const inputPath = path.resolve(rootDir, payload.inputFile);
-      if (!fs.existsSync(inputPath)) {
-        res.status(400).json({ error: "Arquivo de entrada não existir." });
-        return;
-      }
-
-      const preset = payload.preset ?? "cartao";
-      const widthMm = payload.widthMm ?? (preset === "a4" ? 210 : 156);
-      const heightMm = payload.heightMm ?? (preset === "a4" ? 297 : 110);
-      const marginMm = payload.marginMm ?? (preset === "a4" ? 20 : 8);
-
-      const outputPath = path.resolve(rootDir, payload.outputFile);
-
-      const titleFontSizePtRaw = payload.titleFontSizePt ?? 14;
-      const titleFontSizePt =
-        Number.isFinite(titleFontSizePtRaw) && titleFontSizePtRaw >= 6 && titleFontSizePtRaw <= 72
-          ? titleFontSizePtRaw
-          : 14;
-
-      const titleFontStyle = payload.titleFontStyle ?? "bold";
-      const titleFontWeight = titleFontStyle === "bold" || titleFontStyle === "bold_italic" ? 700 : "normal";
-      const titleFontStyleCss = titleFontStyle === "italic" || titleFontStyle === "bold_italic" ? "italic" : "normal";
-
-      const headerEnabled = Boolean(payload.headerEnabled);
-      const footerEnabled = Boolean(payload.footerEnabled);
-
-      const headerTextAlign = payload.headerTextAlign ?? "center";
-      const footerTextAlign = payload.footerTextAlign ?? "center";
-
-      const headerFontSizePtRaw = payload.headerFontSizePt ?? 10;
-      const headerFontSizePt =
-        Number.isFinite(headerFontSizePtRaw) && headerFontSizePtRaw >= 6 && headerFontSizePtRaw <= 72
-          ? headerFontSizePtRaw
-          : 10;
-
-      const footerFontSizePtRaw = payload.footerFontSizePt ?? 10;
-      const footerFontSizePt =
-        Number.isFinite(footerFontSizePtRaw) && footerFontSizePtRaw >= 6 && footerFontSizePtRaw <= 72
-          ? footerFontSizePtRaw
-          : 10;
-
-      const headerLineHeightRaw = payload.headerLineHeight ?? 1.2;
-      const headerLineHeight =
-        Number.isFinite(headerLineHeightRaw) && headerLineHeightRaw >= 0.8 && headerLineHeightRaw <= 3
-          ? headerLineHeightRaw
-          : 1.2;
-
-      const footerLineHeightRaw = payload.footerLineHeight ?? 1.2;
-      const footerLineHeight =
-        Number.isFinite(footerLineHeightRaw) && footerLineHeightRaw >= 0.8 && footerLineHeightRaw <= 3
-          ? footerLineHeightRaw
-          : 1.2;
-
-      const headerFontStyle = payload.headerFontStyle ?? "normal";
-      const headerFontWeight = headerFontStyle === "bold" || headerFontStyle === "bold_italic" ? 700 : "normal";
-      const headerFontStyleCss = headerFontStyle === "italic" || headerFontStyle === "bold_italic" ? "italic" : "normal";
-
-      const footerFontStyle = payload.footerFontStyle ?? "normal";
-      const footerFontWeight = footerFontStyle === "bold" || footerFontStyle === "bold_italic" ? 700 : "normal";
-      const footerFontStyleCss = footerFontStyle === "italic" || footerFontStyle === "bold_italic" ? "italic" : "normal";
-
       const generate = await getGeneratePdf();
-      const result = await generate({
-        inputPath,
-        outputPath,
-        widthMm,
-        heightMm,
-        marginMm,
-        titleFontSizePt,
-        titleFontWeight,
-        titleFontStyle: titleFontStyleCss,
-        headerEnabled,
-        headerLeftImageDataUrl: payload.headerLeftImageDataUrl ?? "",
-        headerRightImageDataUrl: payload.headerRightImageDataUrl ?? "",
-        headerTextTemplate: payload.headerTextTemplate ?? "",
-        headerTextAlign,
-        headerFontSizePt,
-        headerFontWeight,
-        headerFontStyle: headerFontStyleCss,
-        headerLineHeight,
-        footerEnabled,
-        footerLeftImageDataUrl: payload.footerLeftImageDataUrl ?? "",
-        footerRightImageDataUrl: payload.footerRightImageDataUrl ?? "",
-        footerTextTemplate: payload.footerTextTemplate ?? "",
-        footerTextAlign,
-        footerFontSizePt,
-        footerFontWeight,
-        footerFontStyle: footerFontStyleCss,
-        footerLineHeight,
-        bodyTemplate: payload.bodyTemplate ?? "",
-        removals: Array.isArray(payload.removals) ? payload.removals : [],
-        onlyName: Boolean(payload.onlyName),
-        includeTitle: Boolean(payload.includeTitle),
-      });
+      const built = buildGenerateOptions(rootDir, payload);
+      const result = await generate(built.options);
 
       res.json({
-        outputFile: payload.outputFile,
+        outputFile: built.outputFile,
         stats: result.stats,
-        downloadUrl: `/download/${encodeURIComponent(payload.outputFile)}`,
+        downloadUrl: `/download/${encodeURIComponent(built.outputFile)}`,
       });
     } catch (e) {
       res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
     }
+  });
+
+  type JobStatus = "queued" | "running" | "done" | "error";
+  type Job = {
+    id: string;
+    status: JobStatus;
+    percent: number;
+    message: string;
+    createdAt: number;
+    result?: { outputFile: string; stats: unknown; downloadUrl: string };
+    error?: string;
+  };
+
+  const jobs = new Map<string, Job>();
+
+  const updateJob = (jobId: string, update: Partial<Job>) => {
+    const existing = jobs.get(jobId);
+    if (!existing) return;
+    jobs.set(jobId, { ...existing, ...update });
+  };
+
+  app.post("/api/job", async (req, res) => {
+    const payload = req.body as GenerateRequest;
+
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    for (const [id, job] of jobs.entries()) {
+      if (job.createdAt < cutoff) jobs.delete(id);
+    }
+
+    const jobId = randomUUID();
+    jobs.set(jobId, { id: jobId, status: "queued", percent: 0, message: "Fila", createdAt: Date.now() });
+    res.json({ jobId });
+
+    setImmediate(async () => {
+      try {
+        updateJob(jobId, { status: "running", percent: 1, message: "Iniciar" });
+
+        const generate = await getGeneratePdf();
+        const built = buildGenerateOptions(rootDir, payload);
+        const result = await generate(
+          built.options,
+          (p: ProgressUpdate) => updateJob(jobId, { percent: p.percent, message: p.message }),
+        );
+
+        updateJob(jobId, {
+          status: "done",
+          percent: 100,
+          message: "Concluído",
+          result: {
+            outputFile: built.outputFile,
+            stats: result.stats,
+            downloadUrl: `/download/${encodeURIComponent(built.outputFile)}`,
+          },
+        });
+      } catch (e) {
+        updateJob(jobId, {
+          status: "error",
+          percent: 100,
+          message: "Erro",
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    });
+  });
+
+  app.get("/api/job/:id", (req, res) => {
+    const job = jobs.get(req.params.id);
+    if (!job) {
+      res.status(404).json({ error: "Job não existir." });
+      return;
+    }
+    res.json(job);
   });
 
   app.get("/download/:file", (req, res) => {

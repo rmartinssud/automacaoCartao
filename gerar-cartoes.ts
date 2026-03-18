@@ -12,6 +12,8 @@ const defaultBodyText =
   "Atenciosamente\n" +
   "Luiz Werber-Bandeira";
 
+export type ProgressUpdate = { percent: number; message: string };
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -75,7 +77,7 @@ function isLikelyTitleWithName(value: string) {
   return true;
 }
 
-type GenerateOptions = {
+export type GenerateOptions = {
   inputPath: string;
   outputPath: string;
   widthMm: number;
@@ -84,7 +86,14 @@ type GenerateOptions = {
   titleFontSizePt: number;
   titleFontWeight: number | "normal" | "bold";
   titleFontStyle: "normal" | "italic";
+  titleTextAlign: "left" | "center" | "right";
+  bodyTextAlign: "left" | "center" | "right";
+  headerContentGapMm: number;
   headerEnabled: boolean;
+  headerImageBoxWidthMm: number;
+  headerImageBoxHeightMm: number;
+  headerImageAlignX: "left" | "center" | "right";
+  headerImageAlignY: "top" | "middle" | "bottom";
   headerLeftImageDataUrl: string;
   headerRightImageDataUrl: string;
   headerTextTemplate: string;
@@ -93,7 +102,12 @@ type GenerateOptions = {
   headerFontWeight: number | "normal" | "bold";
   headerFontStyle: "normal" | "italic";
   headerLineHeight: number;
+  footerContentGapMm: number;
   footerEnabled: boolean;
+  footerImageBoxWidthMm: number;
+  footerImageBoxHeightMm: number;
+  footerImageAlignX: "left" | "center" | "right";
+  footerImageAlignY: "top" | "middle" | "bottom";
   footerLeftImageDataUrl: string;
   footerRightImageDataUrl: string;
   footerTextTemplate: string;
@@ -179,10 +193,38 @@ function buildCardsFromTitles(
   return { cards, duplicatesRemoved };
 }
 
-export async function generatePdf(options: GenerateOptions) {
+export async function generatePdf(options: GenerateOptions, onProgress?: (update: ProgressUpdate) => void) {
+  const report = (percent: number, message: string) => {
+    onProgress?.({ percent, message });
+  };
+
+  const toJustifyContent = (value: "left" | "center" | "right") => {
+    if (value === "left") return "flex-start";
+    if (value === "right") return "flex-end";
+    return "center";
+  };
+  const toAlignItems = (value: "top" | "middle" | "bottom") => {
+    if (value === "top") return "flex-start";
+    if (value === "bottom") return "flex-end";
+    return "center";
+  };
+  const boxSize = (mm: number) => (Number.isFinite(mm) && mm > 0 ? `${mm}mm` : "auto");
+  const imgBoxStyle = (
+    widthMm: number,
+    heightMm: number,
+    alignX: "left" | "center" | "right",
+    alignY: "top" | "middle" | "bottom",
+  ) =>
+    `width:${boxSize(widthMm)};height:${boxSize(heightMm)};justify-content:${toJustifyContent(alignX)};align-items:${toAlignItems(
+      alignY,
+    )};`;
+
+  report(1, "Ler arquivo e processar dados");
   const raw = fs.readFileSync(options.inputPath, "utf8").trim();
   const parsed = JSON.parse(raw);
+  report(10, "Extrair títulos");
   const titles = extractTitlesFromJson(parsed);
+  report(20, "Montar cartões");
   const built = buildCardsFromTitles(titles, options);
 
   if (built.cards.length === 0) {
@@ -196,6 +238,19 @@ export async function generatePdf(options: GenerateOptions) {
     duplicatesRemoved: built.duplicatesRemoved,
   };
 
+  report(35, "Montar HTML");
+  const headerImgStyle = imgBoxStyle(
+    options.headerImageBoxWidthMm,
+    options.headerImageBoxHeightMm,
+    options.headerImageAlignX,
+    options.headerImageAlignY,
+  );
+  const footerImgStyle = imgBoxStyle(
+    options.footerImageBoxWidthMm,
+    options.footerImageBoxHeightMm,
+    options.footerImageAlignX,
+    options.footerImageAlignY,
+  );
   const html = `<!doctype html>
 <html>
 <head>
@@ -212,13 +267,23 @@ export async function generatePdf(options: GenerateOptions) {
       display: flex;
       flex-direction: column;
     }
-    .header, .footer { flex: 0 0 auto; }
-    .content { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: flex-start; }
-    .title { font-size: ${options.titleFontSizePt}pt; font-weight: ${options.titleFontWeight}; font-style: ${options.titleFontStyle}; white-space: pre-wrap; margin: 0 0 6mm 0; }
-    .body { font-size: 11pt; line-height: 1.25; white-space: pre-wrap; }
+    .header { flex: 0 0 auto; }
+    .content {
+      flex: 1 1 auto;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding-top: ${options.headerContentGapMm}mm;
+      padding-bottom: ${options.footerContentGapMm}mm;
+    }
+    .footer { flex: 0 0 auto; margin-top: auto; }
+    .title { text-align: ${options.titleTextAlign}; font-size: ${options.titleFontSizePt}pt; font-weight: ${options.titleFontWeight}; font-style: ${options.titleFontStyle}; white-space: pre-wrap; margin: 0 0 6mm 0; }
+    .body { text-align: ${options.bodyTextAlign}; font-size: 11pt; line-height: 1.25; white-space: pre-wrap; }
 
-    .hf { display: flex; align-items: center; gap: 4mm; }
-    .hf .img { display: block; max-height: ${options.heightMm}mm; max-width: 100%; height: auto; width: auto; }
+    .hf { display: flex; align-items: stretch; gap: 4mm; width: 100%; box-sizing: border-box; }
+    .hf .img-box { flex: 0 0 auto; display: flex; box-sizing: border-box; }
+    .hf .img-box img { display: block; max-width: 100%; max-height: 100%; height: auto; width: auto; object-fit: contain; }
     .hf .text-wrap { flex: 1 1 auto; display: flex; align-items: center; }
     .hf .text { width: 100%; white-space: pre-wrap; }
 
@@ -233,9 +298,13 @@ ${cards
       `<section class="page">${
         options.headerEnabled
           ? `<header class="header hf">${
-              options.headerLeftImageDataUrl ? `<img class="img" src="${options.headerLeftImageDataUrl}" />` : ""
+              options.headerLeftImageDataUrl
+                ? `<div class="img-box" style="${headerImgStyle}"><img src="${options.headerLeftImageDataUrl}" /></div>`
+                : ""
             }<div class="text-wrap"><div class="text">${escapeHtml(c.headerText)}</div></div>${
-              options.headerRightImageDataUrl ? `<img class="img" src="${options.headerRightImageDataUrl}" />` : ""
+              options.headerRightImageDataUrl
+                ? `<div class="img-box" style="${headerImgStyle}"><img src="${options.headerRightImageDataUrl}" /></div>`
+                : ""
             }</header>`
           : ""
       }<main class="content">${
@@ -243,9 +312,13 @@ ${cards
       }<div class="body">${escapeHtml(c.body)}</div></main>${
         options.footerEnabled
           ? `<footer class="footer hf">${
-              options.footerLeftImageDataUrl ? `<img class="img" src="${options.footerLeftImageDataUrl}" />` : ""
+              options.footerLeftImageDataUrl
+                ? `<div class="img-box" style="${footerImgStyle}"><img src="${options.footerLeftImageDataUrl}" /></div>`
+                : ""
             }<div class="text-wrap"><div class="text">${escapeHtml(c.footerText)}</div></div>${
-              options.footerRightImageDataUrl ? `<img class="img" src="${options.footerRightImageDataUrl}" />` : ""
+              options.footerRightImageDataUrl
+                ? `<div class="img-box" style="${footerImgStyle}"><img src="${options.footerRightImageDataUrl}" /></div>`
+                : ""
             }</footer>`
           : ""
       }</section>`,
@@ -254,17 +327,23 @@ ${cards
 </body>
 </html>`;
 
+  report(55, "Abrir navegador para gerar PDF");
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: "load" });
+  page.setDefaultNavigationTimeout(120_000);
+  report(70, "Renderizar conteúdo");
+  await page.setContent(html, { waitUntil: "domcontentloaded" });
 
+  report(90, "Exportar PDF");
   await page.pdf({
     path: path.resolve(options.outputPath),
     printBackground: true,
     preferCSSPageSize: true,
   });
 
+  report(98, "Finalizar");
   await browser.close();
+  report(100, "Concluído");
   return { outputPath: path.resolve(options.outputPath), stats };
 }
 
@@ -283,7 +362,14 @@ async function main() {
     titleFontSizePt: 14,
     titleFontWeight: 700,
     titleFontStyle: "normal",
+    titleTextAlign: "left",
+    bodyTextAlign: "left",
+    headerContentGapMm: 0,
     headerEnabled: false,
+    headerImageBoxWidthMm: 0,
+    headerImageBoxHeightMm: 0,
+    headerImageAlignX: "center",
+    headerImageAlignY: "middle",
     headerLeftImageDataUrl: "",
     headerRightImageDataUrl: "",
     headerTextTemplate: "",
@@ -292,7 +378,12 @@ async function main() {
     headerFontWeight: "normal",
     headerFontStyle: "normal",
     headerLineHeight: 1.2,
+    footerContentGapMm: 0,
     footerEnabled: false,
+    footerImageBoxWidthMm: 0,
+    footerImageBoxHeightMm: 0,
+    footerImageAlignX: "center",
+    footerImageAlignY: "middle",
     footerLeftImageDataUrl: "",
     footerRightImageDataUrl: "",
     footerTextTemplate: "",
