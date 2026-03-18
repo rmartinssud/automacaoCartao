@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Automação de PDF</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        margin: 24px;
+        max-width: 980px;
+      }
+      fieldset {
+        border: 1px solid #ddd;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      input[type="text"],
+      input[type="number"],
+      select,
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+      }
+      textarea {
+        min-height: 180px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .grid3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 12px;
+      }
+      .row {
+        margin-bottom: 12px;
+      }
+      .inline {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .inline label {
+        margin: 0;
+        font-weight: 500;
+      }
+      button {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid #222;
+        background: #222;
+        color: #fff;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      #result {
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Gerar PDF</h1>
+
+    <fieldset>
+      <div class="grid">
+        <div class="row">
+          <label for="inputFile">Arquivo de entrada</label>
+          <select id="inputFile"></select>
+        </div>
+        <div class="row">
+          <label for="outputFile">Arquivo de saída (.pdf)</label>
+          <input id="outputFile" type="text" value="cartoes.pdf" />
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="row">
+          <label for="preset">Predefinição</label>
+          <select id="preset">
+            <option value="cartao">Cartão (156mm x 110mm)</option>
+            <option value="a4">Carta A4 (210mm x 297mm)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="widthMm">Largura (mm)</label>
+          <input id="widthMm" type="number" value="156" step="0.1" />
+        </div>
+        <div class="row">
+          <label for="heightMm">Altura (mm)</label>
+          <input id="heightMm" type="number" value="110" step="0.1" />
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="row">
+          <label for="marginMm">Margem (mm)</label>
+          <input id="marginMm" type="number" value="8" step="0.1" />
+        </div>
+        <div class="row">
+          <label for="titleFontSizePt">Tamanho da fonte do título (pt)</label>
+          <input id="titleFontSizePt" type="number" value="14" step="1" min="6" max="72" />
+        </div>
+        <div class="row">
+          <label for="titleFontStyle">Estilo da fonte do título</label>
+          <select id="titleFontStyle">
+            <option value="bold">Negrito</option>
+            <option value="normal">Normal</option>
+            <option value="italic">Itálico</option>
+            <option value="bold_italic">Negrito + itálico</option>
+          </select>
+        </div>
+        <div class="row inline">
+          <label><input id="includeTitle" type="checkbox" checked /> Incluir título</label>
+        </div>
+        <div class="row inline">
+          <label><input id="onlyName" type="checkbox" /> Usar somente nome (última linha)</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <div class="row inline">
+        <label><input id="headerEnabled" type="checkbox" /> Incluir cabeçalho</label>
+      </div>
+      <div class="grid">
+        <div class="row">
+          <label for="headerLeftImage">Imagem esquerda (cabeçalho)</label>
+          <input id="headerLeftImage" type="file" accept="image/*" />
+        </div>
+        <div class="row">
+          <label for="headerRightImage">Imagem direita (cabeçalho)</label>
+          <input id="headerRightImage" type="file" accept="image/*" />
+        </div>
+      </div>
+      <div class="grid3">
+        <div class="row">
+          <label for="headerTextAlign">Alinhamento do texto (cabeçalho)</label>
+          <select id="headerTextAlign">
+            <option value="left">Esquerda</option>
+            <option value="center" selected>Centro</option>
+            <option value="right">Direita</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="headerFontSizePt">Tamanho da fonte (pt) (cabeçalho)</label>
+          <input id="headerFontSizePt" type="number" value="10" step="1" min="6" max="72" />
+        </div>
+        <div class="row">
+          <label for="headerFontStyle">Estilo da fonte (cabeçalho)</label>
+          <select id="headerFontStyle">
+            <option value="normal">Normal</option>
+            <option value="bold">Negrito</option>
+            <option value="italic">Itálico</option>
+            <option value="bold_italic">Negrito + itálico</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid3">
+        <div class="row">
+          <label for="headerLineHeight">Espaçamento entre linhas (cabeçalho)</label>
+          <input id="headerLineHeight" type="number" value="1.2" step="0.1" min="0.8" max="3" />
+        </div>
+      </div>
+      <div class="row">
+        <label for="headerTextTemplate">Texto (cabeçalho)</label>
+        <div class="row">
+          <div>Usar <code>{{titulo}}</code> e <code>{{nome}}</code> quando precisar.</div>
+        </div>
+        <textarea id="headerTextTemplate" spellcheck="false"></textarea>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <div class="row inline">
+        <label><input id="footerEnabled" type="checkbox" /> Incluir rodapé</label>
+      </div>
+      <div class="grid">
+        <div class="row">
+          <label for="footerLeftImage">Imagem esquerda (rodapé)</label>
+          <input id="footerLeftImage" type="file" accept="image/*" />
+        </div>
+        <div class="row">
+          <label for="footerRightImage">Imagem direita (rodapé)</label>
+          <input id="footerRightImage" type="file" accept="image/*" />
+        </div>
+      </div>
+      <div class="grid3">
+        <div class="row">
+          <label for="footerTextAlign">Alinhamento do texto (rodapé)</label>
+          <select id="footerTextAlign">
+            <option value="left">Esquerda</option>
+            <option value="center" selected>Centro</option>
+            <option value="right">Direita</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="footerFontSizePt">Tamanho da fonte (pt) (rodapé)</label>
+          <input id="footerFontSizePt" type="number" value="10" step="1" min="6" max="72" />
+        </div>
+        <div class="row">
+          <label for="footerFontStyle">Estilo da fonte (rodapé)</label>
+          <select id="footerFontStyle">
+            <option value="normal">Normal</option>
+            <option value="bold">Negrito</option>
+            <option value="italic">Itálico</option>
+            <option value="bold_italic">Negrito + itálico</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid3">
+        <div class="row">
+          <label for="footerLineHeight">Espaçamento entre linhas (rodapé)</label>
+          <input id="footerLineHeight" type="number" value="1.2" step="0.1" min="0.8" max="3" />
+        </div>
+      </div>
+      <div class="row">
+        <label for="footerTextTemplate">Texto (rodapé)</label>
+        <div class="row">
+          <div>Usar <code>{{titulo}}</code> e <code>{{nome}}</code> quando precisar.</div>
+        </div>
+        <textarea id="footerTextTemplate" spellcheck="false"></textarea>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <div class="row">
+        <label for="removals">Remover do título (um por linha)</label>
+        <textarea id="removals" spellcheck="false"></textarea>
+      </div>
+
+      <div class="row">
+        <label for="bodyTemplate">Texto do corpo</label>
+        <div class="row">
+          <div>Usar <code>{{titulo}}</code> e <code>{{nome}}</code> quando precisar.</div>
+        </div>
+        <textarea id="bodyTemplate" spellcheck="false"></textarea>
+      </div>
+    </fieldset>
+
+    <div class="row inline">
+      <button id="generateBtn">Gerar</button>
+      <div id="status"></div>
+    </div>
+
+    <div id="result" class="row"></div>
+
+    <script>
+      const defaultBody =
+        "Tenho a honra de dirigir-me a Vossa Excelência para pedir vênia ao meu propósito de inscrição à vacância da Cadeira Número Dezessete, da Secção de Medicina, da Egrégia Academia Nacional de Medicina, patronímica de Carlos Pinto Seidl, ocupada pelo inesquecível Acadêmico Professor Dr. Omar da Rosa Santos, por quem sentíamos especial respeito e carinho.\n" +
+        "A presença nas reuniões de quintas-feiras, durante os vários anos, muito serviu ao meu conhecimento médico e permitiu conhecer pessoalmente a todos, admirando cada um.\n" +
+        "Ao inscrever-me para esse conclave prevaleceu meu espírito acadêmico, que sonha um dia poder equiparar-se à magnitude dos pares acadêmicos que formam o notável colegiado da Academia Nacional de Medicina.\n" +
+        "Senhor Acadêmico, solicitarei em breve a Vossa Excelência a permissão de uma visita de apresentação.\n" +
+        "Atenciosamente\n" +
+        "Luiz Werber-Bandeira";
+
+      const el = (id) => document.getElementById(id);
+      const inputFile = el("inputFile");
+      const outputFile = el("outputFile");
+      const preset = el("preset");
+      const widthMm = el("widthMm");
+      const heightMm = el("heightMm");
+      const marginMm = el("marginMm");
+      const titleFontSizePt = el("titleFontSizePt");
+      const titleFontStyle = el("titleFontStyle");
+      const headerEnabled = el("headerEnabled");
+      const headerLeftImage = el("headerLeftImage");
+      const headerRightImage = el("headerRightImage");
+      const headerTextTemplate = el("headerTextTemplate");
+      const headerTextAlign = el("headerTextAlign");
+      const headerFontSizePt = el("headerFontSizePt");
+      const headerFontStyle = el("headerFontStyle");
+      const headerLineHeight = el("headerLineHeight");
+      const footerEnabled = el("footerEnabled");
+      const footerLeftImage = el("footerLeftImage");
+      const footerRightImage = el("footerRightImage");
+      const footerTextTemplate = el("footerTextTemplate");
+      const footerTextAlign = el("footerTextAlign");
+      const footerFontSizePt = el("footerFontSizePt");
+      const footerFontStyle = el("footerFontStyle");
+      const footerLineHeight = el("footerLineHeight");
+      const includeTitle = el("includeTitle");
+      const onlyName = el("onlyName");
+      const removals = el("removals");
+      const bodyTemplate = el("bodyTemplate");
+      const status = el("status");
+      const result = el("result");
+      const generateBtn = el("generateBtn");
+
+      let headerLeftImageDataUrl = "";
+      let headerRightImageDataUrl = "";
+      let footerLeftImageDataUrl = "";
+      let footerRightImageDataUrl = "";
+
+      function readImageAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error("Falhar ao ler imagem."));
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.readAsDataURL(file);
+        });
+      }
+
+      headerLeftImage.addEventListener("change", async () => {
+        const f = headerLeftImage.files && headerLeftImage.files[0];
+        headerLeftImageDataUrl = f ? await readImageAsDataUrl(f) : "";
+      });
+      headerRightImage.addEventListener("change", async () => {
+        const f = headerRightImage.files && headerRightImage.files[0];
+        headerRightImageDataUrl = f ? await readImageAsDataUrl(f) : "";
+      });
+      footerLeftImage.addEventListener("change", async () => {
+        const f = footerLeftImage.files && footerLeftImage.files[0];
+        footerLeftImageDataUrl = f ? await readImageAsDataUrl(f) : "";
+      });
+      footerRightImage.addEventListener("change", async () => {
+        const f = footerRightImage.files && footerRightImage.files[0];
+        footerRightImageDataUrl = f ? await readImageAsDataUrl(f) : "";
+      });
+
+      function setPreset(value) {
+        if (value === "a4") {
+          widthMm.value = "210";
+          heightMm.value = "297";
+          marginMm.value = "20";
+          outputFile.value = outputFile.value.endsWith(".pdf") ? outputFile.value : "carta.pdf";
+        } else {
+          widthMm.value = "156";
+          heightMm.value = "110";
+          marginMm.value = "8";
+          outputFile.value = outputFile.value.endsWith(".pdf") ? outputFile.value : "cartoes.pdf";
+        }
+      }
+
+      preset.addEventListener("change", () => setPreset(preset.value));
+
+      async function loadInputs() {
+        const r = await fetch("/api/inputs");
+        const data = await r.json();
+        inputFile.innerHTML = "";
+        for (const file of data.files || []) {
+          const opt = document.createElement("option");
+          opt.value = file;
+          opt.textContent = file;
+          inputFile.appendChild(opt);
+        }
+        if ([...inputFile.options].some((o) => o.value === "academia.txt")) {
+          inputFile.value = "academia.txt";
+        }
+      }
+
+      async function generate() {
+        result.textContent = "";
+        status.textContent = "Gerar...";
+        generateBtn.disabled = true;
+        try {
+          const removalLines = (removals.value || "")
+            .split(/\r?\n/g)
+            .map((l) => l.trim())
+            .filter(Boolean);
+
+          const payload = {
+            inputFile: inputFile.value,
+            outputFile: outputFile.value,
+            preset: preset.value,
+            widthMm: Number(widthMm.value),
+            heightMm: Number(heightMm.value),
+            marginMm: Number(marginMm.value),
+            titleFontSizePt: Number(titleFontSizePt.value),
+            titleFontStyle: titleFontStyle.value,
+            headerEnabled: Boolean(headerEnabled.checked),
+            headerLeftImageDataUrl,
+            headerRightImageDataUrl,
+            headerTextTemplate: headerTextTemplate.value || "",
+            headerTextAlign: headerTextAlign.value,
+            headerFontSizePt: Number(headerFontSizePt.value),
+            headerFontStyle: headerFontStyle.value,
+            headerLineHeight: Number(headerLineHeight.value),
+            footerEnabled: Boolean(footerEnabled.checked),
+            footerLeftImageDataUrl,
+            footerRightImageDataUrl,
+            footerTextTemplate: footerTextTemplate.value || "",
+            footerTextAlign: footerTextAlign.value,
+            footerFontSizePt: Number(footerFontSizePt.value),
+            footerFontStyle: footerFontStyle.value,
+            footerLineHeight: Number(footerLineHeight.value),
+            bodyTemplate: bodyTemplate.value || "",
+            removals: removalLines,
+            onlyName: Boolean(onlyName.checked),
+            includeTitle: Boolean(includeTitle.checked),
+          };
+
+          const r = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || "Erro ao gerar.");
+
+          const a = document.createElement("a");
+          a.href = data.downloadUrl;
+          a.textContent = "Baixar PDF";
+
+          result.innerHTML =
+            "<div><strong>Gerar concluído</strong></div>" +
+            `<div>Total encontrado: ${data.stats.totalTitlesFound}</div>` +
+            `<div>Gerado: ${data.stats.uniqueCardsGenerated}</div>` +
+            `<div>Repetidos removidos: ${data.stats.duplicatesRemoved}</div>`;
+          result.appendChild(document.createElement("div")).appendChild(a);
+          status.textContent = "";
+        } catch (e) {
+          status.textContent = "";
+          result.textContent = e instanceof Error ? e.message : String(e);
+        } finally {
+          generateBtn.disabled = false;
+        }
+      }
+
+      generateBtn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        generate();
+      });
+
+      removals.value = "EXMO. SENHOR ACADÊMICO\nPROFESSOR DOUTOR";
+      headerTextTemplate.value = "";
+      footerTextTemplate.value = "";
+      bodyTemplate.value = defaultBody;
+      setPreset(preset.value);
+      loadInputs();
+    </script>
+  </body>
+</html>

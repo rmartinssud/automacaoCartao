@@ -1,0 +1,21 @@
+{
+  "name": "automacaoCartao",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gerar": "tsx gerar-cartoes.ts academia.txt cartoes.pdf",
+    "ui": "tsx servidor.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "puppeteer": "^24.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "@types/express": "^4.17.21",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.2"
+  }
+}
