@@ -88,6 +88,8 @@ export type GenerateOptions = {
   titleFontStyle: "normal" | "italic";
   titleTextAlign: "left" | "center" | "right";
   bodyTextAlign: "left" | "center" | "right";
+  bodyLineHeight: number;
+  titleBodyGapMm: number;
   headerContentGapMm: number;
   headerEnabled: boolean;
   headerImageBoxWidthMm: number;
@@ -231,7 +233,15 @@ export async function generatePdf(options: GenerateOptions, onProgress?: (update
     throw new Error("Não encontrar nenhum valor de 'text' com título e nome no JSON.");
   }
 
-  const cards = options.limit === undefined ? built.cards : built.cards.slice(0, options.limit);
+  const sortedCards = [...built.cards].sort((a, b) => {
+    const aName = normalizeText(lastNonEmptyLine(a.title)).trim();
+    const bName = normalizeText(lastNonEmptyLine(b.title)).trim();
+    const c = aName.localeCompare(bName, "pt-BR", { sensitivity: "base" });
+    if (c !== 0) return c;
+    return normalizeKey(a.title).localeCompare(normalizeKey(b.title), "pt-BR", { sensitivity: "base" });
+  });
+
+  const cards = options.limit === undefined ? sortedCards : sortedCards.slice(0, options.limit);
   const stats: GenerateStats = {
     totalTitlesFound: titles.length,
     uniqueCardsGenerated: cards.length,
@@ -278,8 +288,8 @@ export async function generatePdf(options: GenerateOptions, onProgress?: (update
       padding-bottom: ${options.footerContentGapMm}mm;
     }
     .footer { flex: 0 0 auto; margin-top: auto; }
-    .title { text-align: ${options.titleTextAlign}; font-size: ${options.titleFontSizePt}pt; font-weight: ${options.titleFontWeight}; font-style: ${options.titleFontStyle}; white-space: pre-wrap; margin: 0 0 6mm 0; }
-    .body { text-align: ${options.bodyTextAlign}; font-size: 11pt; line-height: 1.25; white-space: pre-wrap; }
+    .title { text-align: ${options.titleTextAlign}; font-size: ${options.titleFontSizePt}pt; font-weight: ${options.titleFontWeight}; font-style: ${options.titleFontStyle}; white-space: pre-wrap; margin: 0 0 ${options.titleBodyGapMm}mm 0; }
+    .body { text-align: ${options.bodyTextAlign}; font-size: 11pt; line-height: ${options.bodyLineHeight}; white-space: pre-wrap; }
 
     .hf { display: flex; align-items: stretch; gap: 4mm; width: 100%; box-sizing: border-box; }
     .hf .img-box { flex: 0 0 auto; display: flex; box-sizing: border-box; }
@@ -364,6 +374,8 @@ async function main() {
     titleFontStyle: "normal",
     titleTextAlign: "left",
     bodyTextAlign: "left",
+    bodyLineHeight: 1.25,
+    titleBodyGapMm: 6,
     headerContentGapMm: 0,
     headerEnabled: false,
     headerImageBoxWidthMm: 0,

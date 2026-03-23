@@ -14,6 +14,8 @@ type GenerateRequest = {
   titleFontStyle?: "normal" | "bold" | "italic" | "bold_italic";
   titleTextAlign?: "left" | "center" | "right";
   bodyTextAlign?: "left" | "center" | "right";
+  bodyLineHeight?: number;
+  titleBodyGapMm?: number;
   headerContentGapMm?: number;
   headerEnabled?: boolean;
   headerImageBoxWidthMm?: number;
@@ -106,6 +108,13 @@ function buildGenerateOptions(rootDir: string, payload: GenerateRequest, modeOve
   const titleTextAlign = payload.titleTextAlign ?? "left";
   const bodyTextAlign = payload.bodyTextAlign ?? "left";
 
+  const bodyLineHeightRaw = payload.bodyLineHeight ?? 1.25;
+  const bodyLineHeight =
+    Number.isFinite(bodyLineHeightRaw) && bodyLineHeightRaw >= 0.8 && bodyLineHeightRaw <= 6 ? bodyLineHeightRaw : 1.25;
+
+  const titleBodyGapMmRaw = payload.titleBodyGapMm ?? 6;
+  const titleBodyGapMm = Number.isFinite(titleBodyGapMmRaw) && titleBodyGapMmRaw >= 0 && titleBodyGapMmRaw <= 100 ? titleBodyGapMmRaw : 6;
+
   const headerContentGapMmRaw = payload.headerContentGapMm ?? 0;
   const headerContentGapMm =
     Number.isFinite(headerContentGapMmRaw) && headerContentGapMmRaw >= 0 && headerContentGapMmRaw <= 100
@@ -186,6 +195,8 @@ function buildGenerateOptions(rootDir: string, payload: GenerateRequest, modeOve
     titleFontStyle: titleFontStyleCss,
     titleTextAlign,
     bodyTextAlign,
+    bodyLineHeight,
+    titleBodyGapMm,
     headerContentGapMm,
     headerEnabled,
     headerImageBoxWidthMm,

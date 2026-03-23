@@ -158,6 +158,14 @@
           </select>
         </div>
         <div class="row">
+          <label for="bodyLineHeight">Espaçamento entre linhas (multiplicador) (texto principal)</label>
+          <input id="bodyLineHeight" type="number" value="1.25" step="0.05" min="0.8" max="6" />
+        </div>
+        <div class="row">
+          <label for="titleBodyGapMm">Espaço entre título e texto (mm)</label>
+          <input id="titleBodyGapMm" type="number" value="6" step="0.5" min="0" max="100" />
+        </div>
+        <div class="row">
           <label for="headerContentGapMm">Espaço entre cabeçalho e conteúdo (mm)</label>
           <input id="headerContentGapMm" type="number" value="0" step="0.5" min="0" max="100" />
         </div>
@@ -377,6 +385,8 @@
       const titleFontStyle = el("titleFontStyle");
       const titleTextAlign = el("titleTextAlign");
       const bodyTextAlign = el("bodyTextAlign");
+      const bodyLineHeight = el("bodyLineHeight");
+      const titleBodyGapMm = el("titleBodyGapMm");
       const headerContentGapMm = el("headerContentGapMm");
       const footerContentGapMm = el("footerContentGapMm");
       const headerEnabled = el("headerEnabled");
@@ -510,6 +520,8 @@
           titleFontStyle: titleFontStyle.value,
           titleTextAlign: titleTextAlign.value,
           bodyTextAlign: bodyTextAlign.value,
+          bodyLineHeight: Number(bodyLineHeight.value),
+          titleBodyGapMm: Number(titleBodyGapMm.value),
           headerContentGapMm: Number(headerContentGapMm.value),
           footerContentGapMm: Number(footerContentGapMm.value),
           headerEnabled: Boolean(headerEnabled.checked),
