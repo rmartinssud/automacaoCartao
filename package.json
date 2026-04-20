@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "express": "^4.21.2",
+    "pdfjs-dist": "^4.10.38",
     "puppeteer": "^24.4.0"
   },
   "devDependencies": {

@@ -69,10 +69,11 @@ function isLikelyTitleWithName(value: string) {
   if (!upper.includes("ACAD")) return false;
   if (!upper.includes("PROFESSOR")) return false;
 
-  const lastLine = lastNonEmptyLine(normalized);
-  if (!lastLine) return false;
-  if (/[0-9]/.test(lastLine)) return false;
-  if (lastLine.split(/\s+/g).filter(Boolean).length < 2) return false;
+  const candidate = extractPersonCandidate(normalized);
+  if (!candidate) return false;
+  if (isHeaderToken(candidate)) return false;
+  if (/[0-9]/.test(candidate)) return false;
+  if (candidate.split(/\s+/g).filter(Boolean).length < 2) return false;
 
   return true;
 }
@@ -122,6 +123,10 @@ export type GenerateOptions = {
   removals: string[];
   onlyName: boolean;
   includeTitle: boolean;
+  standardizeTitleHeader: boolean;
+  defaultGender?: "auto" | "masc" | "fem";
+  forcedFemaleNames?: string[];
+  forcedMaleNames?: string[];
   limit?: number;
 };
 
@@ -137,6 +142,132 @@ function normalizeKey(value: string) {
     .replaceAll(/[ \t]+/g, " ")
     .replaceAll(/\r?\n+/g, "\n")
     .trim();
+}
+
+function normalizePersonNameKey(value: string) {
+  return value
+    .normalize("NFD")
+    .replaceAll(/[\u0300-\u036f]/g, "")
+    .replaceAll(/[\u00A0\u2007\u202F]/g, " ")
+    .replaceAll(/[^\p{L}\p{N}]+/gu, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function normalizeUpperNoAccents(value: string) {
+  return value
+    .normalize("NFD")
+    .replaceAll(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+}
+
+function isHeaderToken(value: string) {
+  const u = normalizeUpperNoAccents(value).replaceAll(/\s+/g, " ").trim();
+  if (!u) return true;
+  if (/\d/.test(u)) return false;
+  if (u.includes("EXMO") || u.includes("EXMA")) return true;
+  if (u.includes("ACAD")) return true;
+  if (u.includes("PROFESSOR")) return true;
+  return false;
+}
+
+function extractPersonCandidate(value: string) {
+  const lines = value
+    .split(/\r?\n/g)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    const words = line.split(/\s+/g).filter(Boolean);
+    if (words.length < 2) continue;
+    if (/\d/.test(line)) continue;
+    if (isHeaderToken(line)) continue;
+    return line;
+  }
+  return lines.at(-1) ?? "";
+}
+
+function guessGenderFromName(name: string) {
+  const first = (name.split(/\s+/g).filter(Boolean).at(0) ?? "").normalize("NFD").replaceAll(/[\u0300-\u036f]/g, "").toUpperCase();
+  const fems = new Set([
+    "ANA",
+    "MARIA",
+    "FERNANDA",
+    "JULIANA",
+    "CAMILA",
+    "ADRIANA",
+    "PAULA",
+    "PATRICIA",
+    "ALINE",
+    "ALICE",
+    "BRUNA",
+    "LUCIANA",
+    "MONICA",
+    "TATIANA",
+    "ELISA",
+    "SILVIA",
+    "CARLA",
+    "BEATRIZ",
+  ]);
+  if (fems.has(first)) return "fem" as const;
+  if (first.endsWith("A")) return "fem" as const;
+  return "masc" as const;
+}
+
+function decideGender(personName: string, title: string, options: Pick<GenerateOptions, "defaultGender" | "forcedFemaleNames" | "forcedMaleNames">) {
+  const key = normalizePersonNameKey(personName);
+  const listToKeys = (arr?: string[]) => new Set((arr ?? []).map((n) => normalizePersonNameKey(n)));
+  const femSet = listToKeys(options.forcedFemaleNames);
+  const mascSet = listToKeys(options.forcedMaleNames);
+  if (femSet.has(key)) return "fem" as const;
+  if (mascSet.has(key)) return "masc" as const;
+
+  const upper = normalizeUpperNoAccents(title).replaceAll(/\s+/g, " ");
+  if (/\bEXMA\b|\bACADEMICA\b|\bPROFESSORA\b|\bDOUTORA\b/.test(upper)) return "fem" as const;
+  if (/\bEXMO\b|\bACADEMICO\b|\bPROFESSOR\b|\bDOUTOR\b/.test(upper)) return "masc" as const;
+
+  if (options.defaultGender && options.defaultGender !== "auto") return options.defaultGender;
+  return guessGenderFromName(personName);
+}
+
+function standardizeHeaderTitle(title: string, gender: "masc" | "fem") {
+  const headerLine = gender === "fem" ? "EXMA. SENHORA ACADÊMICA" : "EXMO. SENHOR ACADÊMICO";
+  const professorLine = gender === "fem" ? "PROFESSORA DOUTORA" : "PROFESSOR DOUTOR";
+
+  const lines = title.split(/\r?\n/g);
+  const out: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      out.push(line);
+      continue;
+    }
+
+    const u = normalizeUpperNoAccents(trimmed).replaceAll(/\s+/g, " ").trim();
+    const hasHeader =
+      u.includes("EXMO") || u.includes("EXMA") || u.includes("SENHOR") || u.includes("SENHORA") || u.includes("ACAD");
+    const hasProfessor = u.includes("PROFESSOR") || u.includes("PROFESSORA") || u.includes("DOUTOR") || u.includes("DOUTORA");
+
+    if (hasHeader && hasProfessor) {
+      out.push(headerLine);
+      out.push(professorLine);
+      continue;
+    }
+    if (hasHeader) {
+      out.push(headerLine);
+      continue;
+    }
+    if (hasProfessor) {
+      out.push(professorLine);
+      continue;
+    }
+
+    out.push(line);
+  }
+
+  return out.join("\n").replaceAll(/\n{3,}/g, "\n\n");
 }
 
 function applyRemovals(value: string, removals: string[]) {
@@ -163,27 +294,142 @@ function extractTitlesFromJson(parsed: unknown) {
   return texts.map(extractUntilFirstComma).filter(isLikelyTitleWithName);
 }
 
+type PdfTextItem = { str?: string; transform?: number[] };
+
+function buildLinesFromPdfTextItems(items: PdfTextItem[]) {
+  const rows = new Map<number, Array<{ x: number; str: string }>>();
+  for (const item of items) {
+    const str = (item?.str ?? "").trim();
+    if (!str) continue;
+    const transform = item?.transform;
+    const x = Array.isArray(transform) && typeof transform[4] === "number" ? transform[4] : 0;
+    const y = Array.isArray(transform) && typeof transform[5] === "number" ? transform[5] : 0;
+    const yKey = Math.round(y / 2) * 2;
+    const row = rows.get(yKey) ?? [];
+    row.push({ x, str });
+    rows.set(yKey, row);
+  }
+
+  const ySorted = [...rows.keys()].sort((a, b) => b - a);
+  return ySorted
+    .map((y) => {
+      const row = rows.get(y) ?? [];
+      row.sort((a, b) => a.x - b.x);
+      return row
+        .map((r) => r.str)
+        .join(" ")
+        .replaceAll(/\s+/g, " ")
+        .trim();
+    })
+    .filter(Boolean);
+}
+
+async function extractLinesFromPdf(inputPath: string, onProgress?: (percent: number, message: string) => void) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const data = new Uint8Array(fs.readFileSync(inputPath));
+  const loadingTask = pdfjs.getDocument({ data });
+  const doc = await loadingTask.promise;
+
+  const pagesLines: string[][] = [];
+  for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
+    const page = await doc.getPage(pageNumber);
+    const textContent = await page.getTextContent();
+    const lines = buildLinesFromPdfTextItems(textContent.items as PdfTextItem[]);
+    pagesLines.push(lines);
+    if (onProgress) {
+      const percent = 2 + Math.round((pageNumber / Math.max(1, doc.numPages)) * 12);
+      onProgress(percent, `Extrair texto do PDF (página ${pageNumber}/${doc.numPages})`);
+    }
+  }
+
+  if (typeof (doc as any).destroy === "function") {
+    await (doc as any).destroy();
+  }
+
+  return pagesLines;
+}
+
+function extractTitlesFromPdfLines(pagesLines: string[][]) {
+  const titles: string[] = [];
+
+  for (const lines of pagesLines) {
+    for (let i = 0; i < lines.length; i++) {
+      const u = normalizeUpperNoAccents(lines[i]);
+      if (!(u.includes("EXMO") || u.includes("EXMA"))) continue;
+
+      const window: string[] = [];
+      for (let j = i; j < lines.length && window.length < 6; j++) {
+        const line = lines[j].trim();
+        if (!line) break;
+        if (j > i && /\d/.test(line)) break;
+        window.push(line);
+
+        const candidate = extractUntilFirstComma(window.join("\n").trim());
+        if (isLikelyTitleWithName(candidate)) {
+          titles.push(candidate);
+          i = j;
+          break;
+        }
+      }
+    }
+  }
+
+  return titles;
+}
+
+async function extractTitlesFromInput(inputPath: string, onProgress?: (percent: number, message: string) => void) {
+  const ext = path.extname(inputPath).toLowerCase();
+
+  if (ext === ".pdf") {
+    onProgress?.(1, "Ler PDF e extrair texto");
+    const pagesLines = await extractLinesFromPdf(inputPath, onProgress);
+    onProgress?.(18, "Extrair títulos");
+    return extractTitlesFromPdfLines(pagesLines);
+  }
+
+  onProgress?.(1, "Ler arquivo e processar dados");
+  const raw = fs.readFileSync(inputPath, "utf8").trim();
+  const parsed = JSON.parse(raw);
+  onProgress?.(10, "Extrair títulos");
+  return extractTitlesFromJson(parsed);
+}
+
 function buildCardsFromTitles(
   titles: string[],
   options: Pick<
     GenerateOptions,
-    "bodyTemplate" | "onlyName" | "removals" | "headerTextTemplate" | "footerTextTemplate"
+    "bodyTemplate" | "onlyName" | "removals" | "headerTextTemplate" | "footerTextTemplate" | "standardizeTitleHeader" | "forcedFemaleNames" | "forcedMaleNames"
   >,
 ) {
   const cards: Card[] = [];
-  const seen = new Set<string>();
+  const seenPerson = new Set<string>();
+  const seenFallback = new Set<string>();
   let duplicatesRemoved = 0;
 
   for (const rawTitle of titles) {
     const removed = applyRemovals(rawTitle, options.removals);
-    const title = options.onlyName ? lastNonEmptyLine(removed) : removed;
-    const key = normalizeKey(title);
-    if (!key) continue;
-    if (seen.has(key)) {
+    const personName = extractPersonCandidate(removed);
+    const personKey = normalizePersonNameKey(personName);
+    let title = options.onlyName ? personName : removed;
+    if (!options.onlyName && options.standardizeTitleHeader) {
+      const g = decideGender(personName, title, {
+        defaultGender: "auto",
+        forcedFemaleNames: options.forcedFemaleNames,
+        forcedMaleNames: options.forcedMaleNames,
+      });
+      title = standardizeHeaderTitle(title, g);
+    }
+    const fallbackKey = normalizeKey(title);
+
+    const keyToUse = personKey || fallbackKey;
+    if (!keyToUse) continue;
+
+    const seenSet = personKey ? seenPerson : seenFallback;
+    if (seenSet.has(keyToUse)) {
       duplicatesRemoved++;
       continue;
     }
-    seen.add(key);
+    seenSet.add(keyToUse);
     cards.push({
       title,
       body: applyPlaceholders(options.bodyTemplate, title),
@@ -221,16 +467,12 @@ export async function generatePdf(options: GenerateOptions, onProgress?: (update
       alignY,
     )};`;
 
-  report(1, "Ler arquivo e processar dados");
-  const raw = fs.readFileSync(options.inputPath, "utf8").trim();
-  const parsed = JSON.parse(raw);
-  report(10, "Extrair títulos");
-  const titles = extractTitlesFromJson(parsed);
+  const titles = await extractTitlesFromInput(options.inputPath, (percent, message) => report(percent, message));
   report(20, "Montar cartões");
   const built = buildCardsFromTitles(titles, options);
 
   if (built.cards.length === 0) {
-    throw new Error("Não encontrar nenhum valor de 'text' com título e nome no JSON.");
+    throw new Error("Não encontrar nenhum título com nome no arquivo de entrada.");
   }
 
   const sortedCards = [...built.cards].sort((a, b) => {
@@ -408,6 +650,10 @@ async function main() {
     removals: [],
     onlyName: false,
     includeTitle: true,
+    standardizeTitleHeader: false,
+    defaultGender: "auto",
+    forcedFemaleNames: [],
+    forcedMaleNames: [],
     limit,
   });
 

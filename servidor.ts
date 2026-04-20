@@ -48,18 +48,25 @@ type GenerateRequest = {
   onlyName: boolean;
   includeTitle: boolean;
   mode?: "preview" | "full";
+  standardizeTitleHeader?: boolean;
+  defaultGender?: "auto" | "masc" | "fem";
+  forcedFemaleNames?: string[];
+  forcedMaleNames?: string[];
 };
 
 function isSimpleFileName(value: string) {
   return /^[a-zA-Z0-9._ -]+$/.test(value) && !value.includes("..") && !value.includes("/") && !value.includes("\\");
 }
 
-function listTxtFiles(rootDir: string) {
+function listInputFiles(rootDir: string) {
   return fs
     .readdirSync(rootDir, { withFileTypes: true })
     .filter((d) => d.isFile())
     .map((d) => d.name)
-    .filter((n) => n.toLowerCase().endsWith(".txt"))
+    .filter((n) => {
+      const lower = n.toLowerCase();
+      return lower.endsWith(".txt") || lower.endsWith(".pdf");
+    })
     .sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
@@ -74,7 +81,9 @@ async function getGeneratePdf() {
 
 function buildGenerateOptions(rootDir: string, payload: GenerateRequest, modeOverride?: "preview" | "full") {
   if (!payload || typeof payload !== "object") throw new Error("Payload inválido.");
-  if (!isSimpleFileName(payload.inputFile) || !payload.inputFile.toLowerCase().endsWith(".txt")) {
+  const inputLower = payload.inputFile?.toLowerCase?.() ?? "";
+  const isInputAllowed = inputLower.endsWith(".txt") || inputLower.endsWith(".pdf");
+  if (!isSimpleFileName(payload.inputFile) || !isInputAllowed) {
     throw new Error("Arquivo de entrada inválido.");
   }
   if (!isSimpleFileName(payload.outputFile) || !payload.outputFile.toLowerCase().endsWith(".pdf")) {
@@ -229,6 +238,10 @@ function buildGenerateOptions(rootDir: string, payload: GenerateRequest, modeOve
     removals: Array.isArray(payload.removals) ? payload.removals : [],
     onlyName: Boolean(payload.onlyName),
     includeTitle: Boolean(payload.includeTitle),
+    standardizeTitleHeader: Boolean(payload.standardizeTitleHeader),
+    defaultGender: payload.defaultGender ?? "auto",
+    forcedFemaleNames: Array.isArray(payload.forcedFemaleNames) ? payload.forcedFemaleNames : [],
+    forcedMaleNames: Array.isArray(payload.forcedMaleNames) ? payload.forcedMaleNames : [],
     limit,
   };
 
@@ -254,7 +267,7 @@ async function main() {
   });
 
   app.get("/api/inputs", (_req, res) => {
-    res.json({ files: listTxtFiles(rootDir) });
+    res.json({ files: listInputFiles(rootDir) });
   });
 
   app.get("/api/health", (_req, res) => {

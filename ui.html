@@ -181,6 +181,31 @@
 
     <fieldset>
       <div class="row inline">
+        <label><input id="standardizeTitleHeader" type="checkbox" /> Padronizar cabeçalho/título por gênero</label>
+      </div>
+      <div class="grid3">
+        <div class="row">
+          <label for="defaultGender">Gênero padrão</label>
+          <select id="defaultGender">
+            <option value="auto" selected>Automático</option>
+            <option value="masc">Masculino</option>
+            <option value="fem">Feminino</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="row">
+          <label for="forcedFemaleNames">Forçar feminino (nomes, um por linha)</label>
+          <textarea id="forcedFemaleNames" spellcheck="false"></textarea>
+        </div>
+        <div class="row">
+          <label for="forcedMaleNames">Forçar masculino (nomes, um por linha)</label>
+          <textarea id="forcedMaleNames" spellcheck="false"></textarea>
+        </div>
+      </div>
+    </fieldset>
+    <fieldset>
+      <div class="row inline">
         <label><input id="headerEnabled" type="checkbox" /> Incluir cabeçalho</label>
       </div>
       <div class="grid">
@@ -424,6 +449,11 @@
       const generateBtn = el("generateBtn");
       const previewBtn = el("previewBtn");
 
+      const standardizeTitleHeader = el("standardizeTitleHeader");
+      const defaultGender = el("defaultGender");
+      const forcedFemaleNames = el("forcedFemaleNames");
+      const forcedMaleNames = el("forcedMaleNames");
+
       let headerLeftImageDataUrl = "";
       let headerRightImageDataUrl = "";
       let footerLeftImageDataUrl = "";
@@ -508,6 +538,12 @@
                 : `preview-${outputFile.value}`)
             : outputFile.value;
 
+        const listFromText = (text) =>
+          (text || "")
+            .split(/\r?\n/g)
+            .map((l) => l.trim())
+            .filter(Boolean);
+
         return {
           mode,
           inputFile: inputFile.value,
@@ -552,6 +588,10 @@
           removals: removalLines,
           onlyName: Boolean(onlyName.checked),
           includeTitle: Boolean(includeTitle.checked),
+          standardizeTitleHeader: Boolean(standardizeTitleHeader.checked),
+          defaultGender: defaultGender.value,
+          forcedFemaleNames: listFromText(forcedFemaleNames.value),
+          forcedMaleNames: listFromText(forcedMaleNames.value),
         };
       }
 
@@ -643,6 +683,7 @@
       bodyTemplate.value = defaultBody;
       setPreset(preset.value);
       loadInputs();
+      forcedFemaleNames.value = "Fernanda Freire Tovar-Moll";
       fetch("/api/health")
         .then((r) => r.json())
         .then((h) => {
