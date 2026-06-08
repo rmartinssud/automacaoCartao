@@ -3,6 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { GenerateOptions, generatePdf as generatePdfType, ProgressUpdate } from "./gerar-cartoes.js";
+import {
+  getAllTemplates,
+  getTemplateById,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate
+} from "./database.js";
 
 type GenerateRequest = {
   inputFile: string;
@@ -52,10 +59,19 @@ type GenerateRequest = {
   defaultGender?: "auto" | "masc" | "fem";
   forcedFemaleNames?: string[];
   forcedMaleNames?: string[];
+  bodyImageEnabled?: boolean;
+  bodyImageDataUrl?: string;
+  bodyImageWidthMm?: number;
+  bodyImageHeightMm?: number;
+  bodyImageWidth?: string;
+  bodyImageHeight?: string;
+  bodyImagePosition?: "center" | "left" | "right" | "float-left" | "float-right";
+  bodyImageMarginMm?: number;
 };
 
 function isSimpleFileName(value: string) {
-  return /^[a-zA-Z0-9._ -]+$/.test(value) && !value.includes("..") && !value.includes("/") && !value.includes("\\");
+  if (typeof value !== "string" || !value) return false;
+  return /^[^/\\:*?"<>|\0]+$/.test(value) && !value.includes("..");
 }
 
 function listInputFiles(rootDir: string) {
@@ -87,7 +103,8 @@ function buildGenerateOptions(rootDir: string, payload: GenerateRequest, modeOve
     throw new Error("Arquivo de entrada inválido.");
   }
   if (!isSimpleFileName(payload.outputFile) || !payload.outputFile.toLowerCase().endsWith(".pdf")) {
-    throw new Error("Arquivo de saída inválido.");
+    console.log("Arquivo de saída inválido:", { outputFile: payload.outputFile, isSimple: isSimpleFileName(payload.outputFile), endsWith: payload.outputFile?.toLowerCase().endsWith(".pdf") });
+    throw new Error(`Arquivo de saída inválido. Nome recebido: "${payload.outputFile}"`);
   }
 
   const inputPath = path.resolve(rootDir, payload.inputFile);
@@ -193,6 +210,30 @@ function buildGenerateOptions(rootDir: string, payload: GenerateRequest, modeOve
   const mode = modeOverride ?? payload.mode ?? "full";
   const limit = mode === "preview" ? 1 : undefined;
 
+  const bodyImageEnabled = Boolean(payload.bodyImageEnabled);
+  const bodyImageDataUrl = payload.bodyImageDataUrl ?? "";
+  const bodyImageWidthMmRaw = payload.bodyImageWidthMm ?? 0;
+  const bodyImageWidthMm =
+    Number.isFinite(bodyImageWidthMmRaw) && bodyImageWidthMmRaw >= 0 && bodyImageWidthMmRaw <= 300
+      ? bodyImageWidthMmRaw
+      : 0;
+
+  const bodyImageHeightMmRaw = payload.bodyImageHeightMm ?? 0;
+  const bodyImageHeightMm =
+    Number.isFinite(bodyImageHeightMmRaw) && bodyImageHeightMmRaw >= 0 && bodyImageHeightMmRaw <= 300
+      ? bodyImageHeightMmRaw
+      : 0;
+
+  const bodyImageWidth = typeof payload.bodyImageWidth === "string" ? payload.bodyImageWidth : "auto";
+  const bodyImageHeight = typeof payload.bodyImageHeight === "string" ? payload.bodyImageHeight : "auto";
+
+  const bodyImagePosition = payload.bodyImagePosition ?? "center";
+  const bodyImageMarginMmRaw = payload.bodyImageMarginMm ?? 4;
+  const bodyImageMarginMm =
+    Number.isFinite(bodyImageMarginMmRaw) && bodyImageMarginMmRaw >= 0 && bodyImageMarginMmRaw <= 100
+      ? bodyImageMarginMmRaw
+      : 4;
+
   const options: GenerateOptions = {
     inputPath,
     outputPath,
@@ -243,6 +284,14 @@ function buildGenerateOptions(rootDir: string, payload: GenerateRequest, modeOve
     forcedFemaleNames: Array.isArray(payload.forcedFemaleNames) ? payload.forcedFemaleNames : [],
     forcedMaleNames: Array.isArray(payload.forcedMaleNames) ? payload.forcedMaleNames : [],
     limit,
+    bodyImageEnabled,
+    bodyImageDataUrl,
+    bodyImageWidthMm,
+    bodyImageHeightMm,
+    bodyImageWidth,
+    bodyImageHeight,
+    bodyImagePosition,
+    bodyImageMarginMm,
   };
 
   return { options, outputFile: payload.outputFile };
@@ -276,6 +325,67 @@ async function main() {
       hasJob: true,
       endpoints: ["/api/health", "/api/inputs", "/api/job", "/api/job/:id", "/download/:file"],
     });
+  });
+
+  app.get("/api/templates", (_req, res) => {
+    try {
+      res.json(getAllTemplates());
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.get("/api/templates/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const template = getTemplateById(id);
+      if (!template) {
+        res.status(404).json({ error: "Modelo não encontrado" });
+        return;
+      }
+      res.json(template);
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/templates", (req, res) => {
+    try {
+      const { name, config } = req.body;
+      if (!name || !config) {
+        res.status(400).json({ error: "Nome e configurações são obrigatórios" });
+        return;
+      }
+      const template = createTemplate(name, JSON.stringify(config));
+      res.json(template);
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.put("/api/templates/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { name, config } = req.body;
+      if (!name || !config) {
+        res.status(400).json({ error: "Nome e configurações são obrigatórios" });
+        return;
+      }
+      updateTemplate(id, name, JSON.stringify(config));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.delete("/api/templates/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      deleteTemplate(id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
   });
 
   app.post("/api/generate", async (req, res) => {

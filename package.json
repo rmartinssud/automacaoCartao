@@ -4,18 +4,20 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "gerar": "tsx gerar-cartoes.ts academia.txt cartoes.pdf",
+    "gerar": "tsx gerar-cartoes.ts \"ANM__Livreto  Academicos  10 NOVEMBRO  DE 2025 (1).pdf\" cartoes.pdf",
     "ui": "tsx servidor.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.9.0",
     "express": "^4.21.2",
     "pdfjs-dist": "^4.10.38",
     "puppeteer": "^24.4.0"
   },
   "devDependencies": {
-    "@types/node": "^22.13.5",
     "@types/express": "^4.17.21",
+    "@types/node": "^22.13.5",
     "tsx": "^4.19.2",
     "typescript": "^5.8.2"
   }

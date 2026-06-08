@@ -61,19 +61,68 @@ function extractUntilFirstComma(value: string) {
   return value.slice(0, commaIndex).trim();
 }
 
+// Words that strongly indicate this is NOT a person name
+const NAME_STOP_WORDS = new Set([
+  "SECÇÃO", "SEÇÃO", "CIRURGIA", "MEDICINA", "ORTOPEDIA", "PEDIATRIA",
+  "NASC", "NASC.", "RESIDÊNCIA", "RESIDENCIA",
+  "AV", "AV.", "RUA", "AVENIDA", "ESTRADA", "TRAVESSA", "RODOVIA",
+  "TEL", "TEL.", "TELEFONE", "CEL", "CEL.", "FAX",
+  "E-MAIL", "EMAIL", "PATRONO", "ANTECESSOR", "SAUDADO",
+  "SOB", "PRESIDÊNCIA", "PRESIDENCIA", "CAD", "NÚMERO", "NUMERO",
+  "CONSULTÓRIO", "CONSULTORIO", "ESPOSA", "ANIV", "ANIV.", "CEP",
+]);
+
+
+
+// Exact heading strings that are NOT names
+const NOT_A_NAME_EXACT = new Set([
+  "ACADEMIA", "ACADEMICOS", "ACADÊMICOS", "EMÉRITOS", "EMERITOS",
+  "TITULARES", "HONORARIOS", "HONORÁRIOS", "CORRESPONDENTES",
+  "HORÁRIOS", "HORARIOS", "FUNCIONAMENTO", "HOSPITAL", "CLINICA", "CLÍNICA",
+  "INSTITUTO", "FACULDADE", "UNIVERSIDADE", "CENTRO", "ESCOLA",
+  "SAMARITANO", "SAUDE", "SAÚDE",
+]);
+
+function isLikelyPersonName(name: string): boolean {
+  const trimmed = name.trim();
+  const words = trimmed.split(/\s+/).filter(Boolean);
+
+  if (words.length < 2 || words.length > 8) return false;
+  if (/\d/.test(trimmed)) return false;
+  if (trimmed.includes('@') || trimmed.includes('http')) return false;
+
+  const upperWords = new Set(words.map(w => normalizeUpperNoAccents(w)));
+
+  for (const w of words) {
+    const uw = normalizeUpperNoAccents(w);
+    if (uw === "NASCIMENTO") continue;
+    if (NOT_A_NAME_EXACT.has(uw)) return false;
+  }
+
+  for (const sw of NAME_STOP_WORDS) {
+    if (sw === "CEL" || sw === "CEL.") continue;
+    if (upperWords.has(sw) || upperWords.has(sw.replace(".", ""))) return false;
+  }
+
+  if (words.some(w => w.length === 1 && !/^[A-ZÁÂÃÀÉÊÍÓÔÕÚÇÑa-záâãàéêíóôõúçñ\-]$/.test(w))) return false;
+
+  return true;
+}
+
 function isLikelyTitleWithName(value: string) {
   const normalized = normalizeText(value).trim();
-  const upper = normalized.toUpperCase();
+  const upper = normalizeUpperNoAccents(normalized);
 
-  if (!(upper.includes("EXMO") || upper.includes("EXMA"))) return false;
-  if (!upper.includes("ACAD")) return false;
-  if (!upper.includes("PROFESSOR")) return false;
+  const hasHeader = upper.includes("EXMO") || upper.includes("EXMA");
+  const hasAcad = upper.includes("ACAD");
+  const hasProf = upper.includes("PROFESSOR");
+
+  // Strict: when a header is present it must also have ACAD + PROFESSOR
+  if (hasHeader && (!hasAcad || !hasProf)) return false;
 
   const candidate = extractPersonCandidate(normalized);
   if (!candidate) return false;
-  if (isHeaderToken(candidate)) return false;
-  if (/[0-9]/.test(candidate)) return false;
-  if (candidate.split(/\s+/g).filter(Boolean).length < 2) return false;
+  if (!isLikelyPersonName(candidate)) return false;
 
   return true;
 }
@@ -128,6 +177,14 @@ export type GenerateOptions = {
   forcedFemaleNames?: string[];
   forcedMaleNames?: string[];
   limit?: number;
+  bodyImageEnabled?: boolean;
+  bodyImageDataUrl?: string;
+  bodyImageWidthMm?: number;
+  bodyImageHeightMm?: number;
+  bodyImageWidth?: string;
+  bodyImageHeight?: string;
+  bodyImagePosition?: "center" | "left" | "right" | "float-left" | "float-right";
+  bodyImageMarginMm?: number;
 };
 
 type GenerateStats = {
@@ -172,23 +229,38 @@ function isHeaderToken(value: string) {
   return false;
 }
 
-function extractPersonCandidate(value: string) {
+function extractPersonCandidate(value: string): string {
   const lines = value
     .split(/\r?\n/g)
     .map((l) => l.trim())
     .filter(Boolean);
+
+  // First pass: look for a line that is entirely uppercase letters (a name line like "MILTON ARY MEIER")
+  for (const line of lines) {
+    if (/^[A-ZÁÂÃÀÉÊÍÓÔÕÚÇÑ][A-ZÁÂÃÀÉÊÍÓÔÕÚÇÑ\s]+$/.test(line)) {
+      const words = line.split(/\s+/).filter(Boolean);
+      if (words.length >= 2 && isLikelyPersonName(line)) {
+        return line;
+      }
+    }
+  }
+
+  // Second pass: iterate from the end, skip non-name lines
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
-    const words = line.split(/\s+/g).filter(Boolean);
-    if (words.length < 2) continue;
     if (/\d/.test(line)) continue;
+    if (line.includes('@') || line.includes('http')) continue;
     if (isHeaderToken(line)) continue;
-    return line;
+    if (isLikelyPersonName(line)) return line;
   }
-  return lines.at(-1) ?? "";
+
+  return "";
 }
 
 function guessGenderFromName(name: string) {
+  const trimmed = name.trim().toUpperCase();
+  if (/\b(FILHO|NETO|SOBRINHO|JUNIOR|JÚNIOR|JR\.?)$/.test(trimmed)) return "masc" as const;
+
   const first = (name.split(/\s+/g).filter(Boolean).at(0) ?? "").normalize("NFD").replaceAll(/[\u0300-\u036f]/g, "").toUpperCase();
   const fems = new Set([
     "ANA",
@@ -209,6 +281,36 @@ function guessGenderFromName(name: string) {
     "SILVIA",
     "CARLA",
     "BEATRIZ",
+    "ELIETE",
+    "MARGARETH",
+    "MIRIAM",
+    "SHIRLEY",
+    "ESTER",
+    "ESTHER",
+    "ISABEL",
+    "IZABEL",
+    "CARMEN",
+    "DENISE",
+    "IRENE",
+    "EUNICE",
+    "CLEONICE",
+    "GISELE",
+    "JACQUELINE",
+    "LOURDES",
+    "MERCEDES",
+    "NAIR",
+    "NISE",
+    "RACHEL",
+    "ROSE",
+    "RUTH",
+    "SOLANGE",
+    "SUELY",
+    "SUELI",
+    "VIVIAN",
+    "ELISABETH",
+    "ELIZABETH",
+    "IVONE",
+    "YVONE",
   ]);
   if (fems.has(first)) return "fem" as const;
   if (first.endsWith("A")) return "fem" as const;
@@ -238,6 +340,9 @@ function standardizeHeaderTitle(title: string, gender: "masc" | "fem") {
   const lines = title.split(/\r?\n/g);
   const out: string[] = [];
 
+  let foundHeader = false;
+  let foundProfessor = false;
+
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) {
@@ -253,19 +358,26 @@ function standardizeHeaderTitle(title: string, gender: "masc" | "fem") {
     if (hasHeader && hasProfessor) {
       out.push(headerLine);
       out.push(professorLine);
+      foundHeader = true;
+      foundProfessor = true;
       continue;
     }
     if (hasHeader) {
       out.push(headerLine);
+      foundHeader = true;
       continue;
     }
     if (hasProfessor) {
       out.push(professorLine);
+      foundProfessor = true;
       continue;
     }
 
     out.push(line);
   }
+
+  if (!foundProfessor) out.unshift(professorLine);
+  if (!foundHeader) out.unshift(headerLine);
 
   return out.join("\n").replaceAll(/\n{3,}/g, "\n\n");
 }
@@ -294,19 +406,20 @@ function extractTitlesFromJson(parsed: unknown) {
   return texts.map(extractUntilFirstComma).filter(isLikelyTitleWithName);
 }
 
-type PdfTextItem = { str?: string; transform?: number[] };
+type PdfTextItem = { str?: string; transform?: number[]; width?: number };
 
 function buildLinesFromPdfTextItems(items: PdfTextItem[]) {
-  const rows = new Map<number, Array<{ x: number; str: string }>>();
+  const rows = new Map<number, Array<{ x: number; str: string; width: number }>>();
   for (const item of items) {
-    const str = (item?.str ?? "").trim();
-    if (!str) continue;
+    const str = item?.str ?? "";
+    if (!str.trim()) continue;
     const transform = item?.transform;
     const x = Array.isArray(transform) && typeof transform[4] === "number" ? transform[4] : 0;
     const y = Array.isArray(transform) && typeof transform[5] === "number" ? transform[5] : 0;
+    const width = typeof item?.width === "number" ? item.width : 0;
     const yKey = Math.round(y / 2) * 2;
     const row = rows.get(yKey) ?? [];
-    row.push({ x, str });
+    row.push({ x, str, width });
     rows.set(yKey, row);
   }
 
@@ -315,16 +428,30 @@ function buildLinesFromPdfTextItems(items: PdfTextItem[]) {
     .map((y) => {
       const row = rows.get(y) ?? [];
       row.sort((a, b) => a.x - b.x);
-      return row
-        .map((r) => r.str)
-        .join(" ")
-        .replaceAll(/\s+/g, " ")
-        .trim();
+      
+      let lineText = "";
+      for (let i = 0; i < row.length; i++) {
+        const item = row[i];
+        if (i === 0) {
+          lineText = item.str;
+        } else {
+          const prev = row[i - 1];
+          const prevEnd = prev.x + prev.width;
+          const gap = item.x - prevEnd;
+          
+          if (gap < 1.0) {
+            lineText += item.str;
+          } else {
+            lineText += " " + item.str;
+          }
+        }
+      }
+      return lineText.replaceAll(/\s+/g, " ").trim();
     })
     .filter(Boolean);
 }
 
-async function extractLinesFromPdf(inputPath: string, onProgress?: (percent: number, message: string) => void) {
+export async function extractLinesFromPdf(inputPath: string, onProgress?: (percent: number, message: string) => void) {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const data = new Uint8Array(fs.readFileSync(inputPath));
   const loadingTask = pdfjs.getDocument({ data });
@@ -349,27 +476,73 @@ async function extractLinesFromPdf(inputPath: string, onProgress?: (percent: num
   return pagesLines;
 }
 
-function extractTitlesFromPdfLines(pagesLines: string[][]) {
+export function extractTitlesFromPdfLines(pagesLines: string[][]) {
   const titles: string[] = [];
+  let isAllowedCategory = true;
 
   for (const lines of pagesLines) {
     for (let i = 0; i < lines.length; i++) {
       const u = normalizeUpperNoAccents(lines[i]);
-      if (!(u.includes("EXMO") || u.includes("EXMA"))) continue;
+      const noSpaces = u.replaceAll(/\s+/g, "");
 
-      const window: string[] = [];
-      for (let j = i; j < lines.length && window.length < 6; j++) {
-        const line = lines[j].trim();
-        if (!line) break;
-        if (j > i && /\d/.test(line)) break;
-        window.push(line);
+      if (
+        noSpaces === "MEMBROSEMERITOS" ||
+        noSpaces === "EMERITOS" ||
+        noSpaces === "MEMBROSTITULARES" ||
+        noSpaces === "TITULARES"
+      ) {
+        isAllowedCategory = true;
+      } else if (
+        noSpaces === "CORRESPONDENTES" ||
+        noSpaces === "HONORARIOS" ||
+        noSpaces === "DIRETORIA" ||
+        noSpaces === "ADMINISTRACAO" ||
+        noSpaces === "CORRESPONDENTESNACIONAIS" ||
+        noSpaces === "CORRESPONDENTESINTERNACIONAIS" ||
+        noSpaces === "HONORARIOSNACIONAIS" ||
+        noSpaces === "HONORARIOSINTERNACIONAIS" ||
+        noSpaces === "SUMARIO"
+      ) {
+        isAllowedCategory = false;
+      }
 
-        const candidate = extractUntilFirstComma(window.join("\n").trim());
-        if (isLikelyTitleWithName(candidate)) {
-          titles.push(candidate);
-          i = j;
-          break;
+      if (!isAllowedCategory) continue;
+
+      let name = lines[i].trim().replace(/_+$/, "").trim();
+      const nextU = normalizeUpperNoAccents(lines[i+1] || "");
+      const nextNextU = normalizeUpperNoAccents(lines[i+2] || "");
+
+      const hasBlockMarker =
+        nextU.includes("SECCAO") ||
+        nextU.includes("CIRURGIA") ||
+        nextU.includes("MEDICINA") ||
+        nextU.includes("CIENCIAS") ||
+        nextU.includes("NASC") ||
+        nextNextU.includes("NASC") ||
+        nextU.includes("NA SC") ||
+        nextNextU.includes("NA SC");
+
+      if (hasBlockMarker && isLikelyPersonName(name) && name !== "do Rio de Janeiro") {
+        titles.push(name);
+        continue;
+      }
+
+      // Path 1: standard EXMO/EXMA header — collect a window of lines
+      if (u.includes("EXMO") || u.includes("EXMA")) {
+        const window: string[] = [];
+        for (let j = i; j < lines.length && window.length < 6; j++) {
+          const line = lines[j].trim();
+          if (!line) break;
+          if (j > i && /\d/.test(line)) break;
+          window.push(line);
+          const candidate = extractUntilFirstComma(window.join("\n").trim());
+          if (isLikelyTitleWithName(candidate)) {
+            titles.push(candidate);
+            i = j;
+            break;
+          }
         }
+        continue;
       }
     }
   }
@@ -408,9 +581,13 @@ function buildCardsFromTitles(
 
   for (const rawTitle of titles) {
     const removed = applyRemovals(rawTitle, options.removals);
-    const personName = extractPersonCandidate(removed);
+    const personNameOriginal = extractPersonCandidate(removed);
+    const personName = personNameOriginal.toUpperCase();
     const personKey = normalizePersonNameKey(personName);
     let title = options.onlyName ? personName : removed;
+    if (personNameOriginal && !options.onlyName) {
+      title = title.replaceAll(personNameOriginal, personName);
+    }
     if (!options.onlyName && options.standardizeTitleHeader) {
       const g = decideGender(personName, title, {
         defaultGender: "auto",
@@ -531,7 +708,7 @@ export async function generatePdf(options: GenerateOptions, onProgress?: (update
     }
     .footer { flex: 0 0 auto; margin-top: auto; }
     .title { text-align: ${options.titleTextAlign}; font-size: ${options.titleFontSizePt}pt; font-weight: ${options.titleFontWeight}; font-style: ${options.titleFontStyle}; white-space: pre-wrap; margin: 0 0 ${options.titleBodyGapMm}mm 0; }
-    .body { text-align: ${options.bodyTextAlign}; font-size: 11pt; line-height: ${options.bodyLineHeight}; white-space: pre-wrap; }
+    .body { text-align: ${options.bodyTextAlign}; font-size: 11pt; line-height: ${options.bodyLineHeight}; white-space: pre-wrap; display: flow-root; }
 
     .hf { display: flex; align-items: stretch; gap: 4mm; width: 100%; box-sizing: border-box; }
     .hf .img-box { flex: 0 0 auto; display: flex; box-sizing: border-box; }
@@ -561,7 +738,49 @@ ${cards
           : ""
       }<main class="content">${
         options.includeTitle ? `<div class="title">${escapeHtml(c.title)}</div>` : ""
-      }<div class="body">${escapeHtml(c.body)}</div></main>${
+      }<div class="body">${(() => {
+        let bodyHtml = escapeHtml(c.body);
+        const bodyImageEnabled = Boolean(options.bodyImageEnabled);
+        const bodyImageDataUrl = options.bodyImageDataUrl ?? "";
+        if (bodyImageEnabled && bodyImageDataUrl) {
+          let widthStyle = "auto";
+          if (options.bodyImageWidth && options.bodyImageWidth !== "0") {
+            widthStyle = options.bodyImageWidth;
+          } else if (typeof options.bodyImageWidthMm === "number" && options.bodyImageWidthMm > 0) {
+            widthStyle = `${options.bodyImageWidthMm}mm`;
+          }
+
+          let heightStyle = "auto";
+          if (options.bodyImageHeight && options.bodyImageHeight !== "0") {
+            heightStyle = options.bodyImageHeight;
+          } else if (typeof options.bodyImageHeightMm === "number" && options.bodyImageHeightMm > 0) {
+            heightStyle = `${options.bodyImageHeightMm}mm`;
+          }
+          
+          const margin = options.bodyImageMarginMm ?? 4;
+          let imgStyle = `width:${widthStyle};height:${heightStyle};max-width:100%;object-fit:contain;`;
+          const position = options.bodyImagePosition ?? "center";
+          if (position === "center") {
+            imgStyle += ` display:block; margin:${margin}mm auto;`;
+          } else if (position === "left") {
+            imgStyle += ` display:block; margin:${margin}mm auto ${margin}mm 0;`;
+          } else if (position === "right") {
+            imgStyle += ` display:block; margin:${margin}mm 0 ${margin}mm auto;`;
+          } else if (position === "float-left") {
+            imgStyle += ` float:left; margin:0 ${margin}mm ${margin}mm 0;`;
+          } else if (position === "float-right") {
+            imgStyle += ` float:right; margin:0 0 ${margin}mm ${margin}mm;`;
+          }
+          
+          const imgHtml = `<img class="body-image" src="${bodyImageDataUrl}" style="${imgStyle}" />`;
+          if (bodyHtml.includes("{{imagem}}")) {
+            bodyHtml = bodyHtml.replaceAll("{{imagem}}", imgHtml);
+          } else {
+            bodyHtml += "\n" + imgHtml;
+          }
+        }
+        return bodyHtml;
+      })()}</div></main>${
         options.footerEnabled
           ? `<footer class="footer hf">${
               options.footerLeftImageDataUrl
@@ -655,6 +874,14 @@ async function main() {
     forcedFemaleNames: [],
     forcedMaleNames: [],
     limit,
+    bodyImageEnabled: false,
+    bodyImageDataUrl: "",
+    bodyImageWidthMm: 0,
+    bodyImageHeightMm: 0,
+    bodyImageWidth: "auto",
+    bodyImageHeight: "auto",
+    bodyImagePosition: "center",
+    bodyImageMarginMm: 4,
   });
 
   process.stdout.write(

@@ -85,6 +85,28 @@
     <h1>Gerar PDF</h1>
 
     <fieldset>
+      <legend><b>Modelos Salvos</b></legend>
+      <div class="grid">
+        <div class="row">
+          <label for="templateSelect">Carregar Modelo Existente</label>
+          <div class="inline">
+            <select id="templateSelect" style="flex: 1;"><option value="">-- Selecione um Modelo --</option></select>
+            <button id="loadTemplateBtn">Carregar</button>
+            <button id="updateTemplateBtn">Atualizar Selecionado</button>
+            <button id="deleteTemplateBtn" style="background: darkred;">Excluir</button>
+          </div>
+        </div>
+        <div class="row">
+          <label for="templateName">Salvar Como Novo Modelo</label>
+          <div class="inline">
+            <input id="templateName" type="text" placeholder="Nome do novo modelo" style="flex: 1;" />
+            <button id="saveTemplateBtn">Salvar</button>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
       <div class="grid">
         <div class="row">
           <label for="inputFile">Arquivo de entrada</label>
@@ -147,6 +169,7 @@
             <option value="left" selected>Esquerda</option>
             <option value="center">Centro</option>
             <option value="right">Direita</option>
+            <option value="justify">Justificado</option>
           </select>
         </div>
         <div class="row">
@@ -155,6 +178,7 @@
             <option value="left" selected>Esquerda</option>
             <option value="center">Centro</option>
             <option value="right">Direita</option>
+            <option value="justify">Justificado</option>
           </select>
         </div>
         <div class="row">
@@ -212,10 +236,12 @@
         <div class="row">
           <label for="headerLeftImage">Imagem esquerda (cabeçalho)</label>
           <input id="headerLeftImage" type="file" accept="image/*" />
+          <div id="headerLeftImageStatus" style="font-size: 0.8em; color: green; margin-top: 4px;"></div>
         </div>
         <div class="row">
           <label for="headerRightImage">Imagem direita (cabeçalho)</label>
           <input id="headerRightImage" type="file" accept="image/*" />
+          <div id="headerRightImageStatus" style="font-size: 0.8em; color: green; margin-top: 4px;"></div>
         </div>
       </div>
       <div class="grid3">
@@ -225,6 +251,7 @@
             <option value="left">Esquerda</option>
             <option value="center" selected>Centro</option>
             <option value="right">Direita</option>
+            <option value="justify">Justificado</option>
           </select>
         </div>
         <div class="row">
@@ -291,10 +318,12 @@
         <div class="row">
           <label for="footerLeftImage">Imagem esquerda (rodapé)</label>
           <input id="footerLeftImage" type="file" accept="image/*" />
+          <div id="footerLeftImageStatus" style="font-size: 0.8em; color: green; margin-top: 4px;"></div>
         </div>
         <div class="row">
           <label for="footerRightImage">Imagem direita (rodapé)</label>
           <input id="footerRightImage" type="file" accept="image/*" />
+          <div id="footerRightImageStatus" style="font-size: 0.8em; color: green; margin-top: 4px;"></div>
         </div>
       </div>
       <div class="grid3">
@@ -304,6 +333,7 @@
             <option value="left">Esquerda</option>
             <option value="center" selected>Centro</option>
             <option value="right">Direita</option>
+            <option value="justify">Justificado</option>
           </select>
         </div>
         <div class="row">
@@ -363,15 +393,70 @@
     </fieldset>
 
     <fieldset>
+      <legend><b>Imagem do Corpo (Opcional)</b></legend>
+      <div class="row inline">
+        <label><input id="bodyImageEnabled" type="checkbox" /> Habilitar imagem no corpo</label>
+      </div>
+      <div class="grid">
+        <div class="row">
+          <label for="bodyImage">Selecionar Imagem</label>
+          <input id="bodyImage" type="file" accept="image/*" />
+          <div id="bodyImageStatus" style="font-size: 0.8em; color: green; margin-top: 4px;"></div>
+        </div>
+        <div class="row">
+          <label for="bodyImagePosition">Posicionamento da Imagem</label>
+          <select id="bodyImagePosition">
+            <option value="center" selected>Centro (bloco)</option>
+            <option value="left">Esquerda (bloco)</option>
+            <option value="right">Direita (bloco)</option>
+            <option value="float-left">Flutuar à esquerda (texto contorna à direita)</option>
+            <option value="float-right">Flutuar à direita (texto contorna à esquerda)</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid3">
+        <div class="row">
+          <label for="bodyImageWidth">Largura da imagem (0 para auto)</label>
+          <div style="display: flex; gap: 4px;">
+            <input id="bodyImageWidth" type="number" value="0" step="0.5" style="flex: 1;" />
+            <select id="bodyImageWidthUnit" style="width: 70px; padding: 6px; border-radius: 8px; border: 1px solid #ccc;">
+              <option value="mm" selected>mm</option>
+              <option value="px">px</option>
+              <option value="%">%</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <label for="bodyImageHeight">Altura da imagem (0 para auto)</label>
+          <div style="display: flex; gap: 4px;">
+            <input id="bodyImageHeight" type="number" value="0" step="0.5" style="flex: 1;" />
+            <select id="bodyImageHeightUnit" style="width: 70px; padding: 6px; border-radius: 8px; border: 1px solid #ccc;">
+              <option value="mm" selected>mm</option>
+              <option value="px">px</option>
+              <option value="%">%</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <label for="bodyImageMarginMm">Margem ao redor da imagem (mm)</label>
+          <input id="bodyImageMarginMm" type="number" value="4" step="0.5" min="0" max="100" />
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
       <div class="row">
         <label for="removals">Remover do título (um por linha)</label>
         <textarea id="removals" spellcheck="false"></textarea>
       </div>
 
       <div class="row">
-        <label for="bodyTemplate">Texto do corpo</label>
+        <label for="bodyTemplate">
+          Texto do corpo
+          <button type="button" id="cleanLinesBtn" style="font-size: 0.8em; padding: 4px 8px; margin-left: 10px;">Juntar linhas quebradas</button>
+        </label>
         <div class="row">
-          <div>Usar <code>{{titulo}}</code> e <code>{{nome}}</code> quando precisar.</div>
+          <div>Usar <code>{{titulo}}</code>, <code>{{nome}}</code> e <code>{{imagem}}</code> (onde deseja exibir a imagem do corpo) quando precisar.</div>
         </div>
         <textarea id="bodyTemplate" spellcheck="false"></textarea>
       </div>
@@ -454,10 +539,20 @@
       const forcedFemaleNames = el("forcedFemaleNames");
       const forcedMaleNames = el("forcedMaleNames");
 
+      const bodyImageEnabled = el("bodyImageEnabled");
+      const bodyImage = el("bodyImage");
+      const bodyImagePosition = el("bodyImagePosition");
+      const bodyImageWidth = el("bodyImageWidth");
+      const bodyImageWidthUnit = el("bodyImageWidthUnit");
+      const bodyImageHeight = el("bodyImageHeight");
+      const bodyImageHeightUnit = el("bodyImageHeightUnit");
+      const bodyImageMarginMm = el("bodyImageMarginMm");
+
       let headerLeftImageDataUrl = "";
       let headerRightImageDataUrl = "";
       let footerLeftImageDataUrl = "";
       let footerRightImageDataUrl = "";
+      let bodyImageDataUrl = "";
 
       function readImageAsDataUrl(file) {
         return new Promise((resolve, reject) => {
@@ -483,6 +578,10 @@
       footerRightImage.addEventListener("change", async () => {
         const f = footerRightImage.files && footerRightImage.files[0];
         footerRightImageDataUrl = f ? await readImageAsDataUrl(f) : "";
+      });
+      bodyImage.addEventListener("change", async () => {
+        const f = bodyImage.files && bodyImage.files[0];
+        bodyImageDataUrl = f ? await readImageAsDataUrl(f) : "";
       });
 
       function setPreset(value) {
@@ -511,8 +610,9 @@
           opt.textContent = file;
           inputFile.appendChild(opt);
         }
-        if ([...inputFile.options].some((o) => o.value === "academia.txt")) {
-          inputFile.value = "academia.txt";
+        const pdfOption = [...inputFile.options].find((o) => o.value.toLowerCase().endsWith(".pdf"));
+        if (pdfOption) {
+          inputFile.value = pdfOption.value;
         }
       }
 
@@ -531,12 +631,15 @@
           .map((l) => l.trim())
           .filter(Boolean);
 
-        const outputName =
+        let outputName =
           mode === "preview"
             ? (outputFile.value.toLowerCase().startsWith("preview-")
                 ? outputFile.value
                 : `preview-${outputFile.value}`)
             : outputFile.value;
+        if (!outputName.toLowerCase().endsWith(".pdf")) {
+          outputName += ".pdf";
+        }
 
         const listFromText = (text) =>
           (text || "")
@@ -592,6 +695,14 @@
           defaultGender: defaultGender.value,
           forcedFemaleNames: listFromText(forcedFemaleNames.value),
           forcedMaleNames: listFromText(forcedMaleNames.value),
+          bodyImageEnabled: Boolean(bodyImageEnabled.checked),
+          bodyImageDataUrl,
+          bodyImageWidth: bodyImageWidth.value && bodyImageWidth.value !== "0" ? bodyImageWidth.value + bodyImageWidthUnit.value : "auto",
+          bodyImageHeight: bodyImageHeight.value && bodyImageHeight.value !== "0" ? bodyImageHeight.value + bodyImageHeightUnit.value : "auto",
+          bodyImageWidthMm: 0,
+          bodyImageHeightMm: 0,
+          bodyImagePosition: bodyImagePosition.value,
+          bodyImageMarginMm: Number(bodyImageMarginMm.value),
         };
       }
 
@@ -677,6 +788,19 @@
         runJob("preview");
       });
 
+      el("cleanLinesBtn").addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const text = bodyTemplate.value;
+        if (!text) return;
+        // Divide por 2 ou mais quebras de linha para isolar parágrafos reais
+        const paragraphs = text.split(/\n\s*\n/);
+        const cleaned = paragraphs.map(p => {
+          // Dentro do parágrafo, substitui uma única quebra de linha por um espaço
+          return p.replace(/(?<!\n)\n(?!\n)/g, " ").replace(/\s+/g, " ").trim();
+        });
+        bodyTemplate.value = cleaned.join("\n\n");
+      });
+
       removals.value = "EXMO. SENHOR ACADÊMICO\nPROFESSOR DOUTOR";
       headerTextTemplate.value = "";
       footerTextTemplate.value = "";
@@ -696,6 +820,216 @@
           result.textContent =
             "Servidor não está atualizado para suportar jobs (/api/job). Rodar: npm run ui e abrir a URL do terminal.";
         });
+
+      // --- Modelos (Templates) Logic ---
+      const templateSelect = el("templateSelect");
+      const templateNameInput = el("templateName");
+      const loadTemplateBtn = el("loadTemplateBtn");
+      const updateTemplateBtn = el("updateTemplateBtn");
+      const deleteTemplateBtn = el("deleteTemplateBtn");
+      const saveTemplateBtn = el("saveTemplateBtn");
+
+      async function loadTemplatesList() {
+        try {
+          const r = await fetch("/api/templates");
+          const templates = await r.json();
+          templateSelect.innerHTML = '<option value="">-- Selecione um Modelo --</option>';
+          for (const t of templates) {
+            const opt = document.createElement("option");
+            opt.value = t.id;
+            opt.textContent = t.name;
+            templateSelect.appendChild(opt);
+          }
+        } catch (e) {
+          console.error("Falha ao carregar modelos:", e);
+        }
+      }
+
+      function applyTemplate(config) {
+        if (!config) return;
+        const setVal = (id, val) => { const e = el(id); if (e) e.value = val !== undefined ? val : ""; };
+        const setChk = (id, val) => { const e = el(id); if (e) e.checked = !!val; };
+
+        setVal("preset", config.preset);
+        setPreset(config.preset || "cartao");
+
+        setVal("widthMm", config.widthMm);
+        setVal("heightMm", config.heightMm);
+        setVal("marginMm", config.marginMm);
+
+        setVal("titleFontSizePt", config.titleFontSizePt);
+        setVal("titleFontStyle", config.titleFontStyle);
+        setVal("titleTextAlign", config.titleTextAlign);
+        setVal("bodyTextAlign", config.bodyTextAlign);
+        setVal("bodyLineHeight", config.bodyLineHeight);
+        setVal("titleBodyGapMm", config.titleBodyGapMm);
+
+        setVal("headerContentGapMm", config.headerContentGapMm);
+        setChk("headerEnabled", config.headerEnabled);
+        setVal("headerImageBoxWidthMm", config.headerImageBoxWidthMm);
+        setVal("headerImageBoxHeightMm", config.headerImageBoxHeightMm);
+        setVal("headerImageAlignX", config.headerImageAlignX);
+        setVal("headerImageAlignY", config.headerImageAlignY);
+
+        headerLeftImageDataUrl = config.headerLeftImageDataUrl || "";
+        el("headerLeftImageStatus").textContent = headerLeftImageDataUrl ? "(Imagem carregada do modelo)" : "";
+        headerRightImageDataUrl = config.headerRightImageDataUrl || "";
+        el("headerRightImageStatus").textContent = headerRightImageDataUrl ? "(Imagem carregada do modelo)" : "";
+
+        setVal("headerTextTemplate", config.headerTextTemplate);
+        setVal("headerTextAlign", config.headerTextAlign);
+        setVal("headerFontSizePt", config.headerFontSizePt);
+        setVal("headerFontStyle", config.headerFontStyle);
+        setVal("headerLineHeight", config.headerLineHeight);
+
+        setVal("footerContentGapMm", config.footerContentGapMm);
+        setChk("footerEnabled", config.footerEnabled);
+        setVal("footerImageBoxWidthMm", config.footerImageBoxWidthMm);
+        setVal("footerImageBoxHeightMm", config.footerImageBoxHeightMm);
+        setVal("footerImageAlignX", config.footerImageAlignX);
+        setVal("footerImageAlignY", config.footerImageAlignY);
+
+        footerLeftImageDataUrl = config.footerLeftImageDataUrl || "";
+        el("footerLeftImageStatus").textContent = footerLeftImageDataUrl ? "(Imagem carregada do modelo)" : "";
+        footerRightImageDataUrl = config.footerRightImageDataUrl || "";
+        el("footerRightImageStatus").textContent = footerRightImageDataUrl ? "(Imagem carregada do modelo)" : "";
+
+        setVal("footerTextTemplate", config.footerTextTemplate);
+        setVal("footerTextAlign", config.footerTextAlign);
+        setVal("footerFontSizePt", config.footerFontSizePt);
+        setVal("footerFontStyle", config.footerFontStyle);
+        setVal("footerLineHeight", config.footerLineHeight);
+
+        setVal("bodyTemplate", config.bodyTemplate);
+        setVal("removals", (config.removals || []).join("\n"));
+        setChk("onlyName", config.onlyName);
+        setChk("includeTitle", config.includeTitle);
+        setChk("standardizeTitleHeader", config.standardizeTitleHeader);
+        setVal("defaultGender", config.defaultGender);
+        setVal("forcedFemaleNames", (config.forcedFemaleNames || []).join("\n"));
+        setVal("forcedMaleNames", (config.forcedMaleNames || []).join("\n"));
+
+        setChk("bodyImageEnabled", config.bodyImageEnabled);
+        bodyImageDataUrl = config.bodyImageDataUrl || "";
+        el("bodyImageStatus").textContent = bodyImageDataUrl ? "(Imagem carregada do modelo)" : "";
+        setVal("bodyImagePosition", config.bodyImagePosition || "center");
+        let widthVal = 0;
+        let widthUnit = "mm";
+        if (config.bodyImageWidth && config.bodyImageWidth !== "auto") {
+          const match = config.bodyImageWidth.match(/^([\d.]+)(.*)$/);
+          if (match) {
+            widthVal = parseFloat(match[1]);
+            widthUnit = match[2] || "mm";
+          }
+        } else if (config.bodyImageWidthMm && config.bodyImageWidthMm > 0) {
+          widthVal = config.bodyImageWidthMm;
+          widthUnit = "mm";
+        }
+        setVal("bodyImageWidth", widthVal);
+        setVal("bodyImageWidthUnit", widthUnit);
+
+        let heightVal = 0;
+        let heightUnit = "mm";
+        if (config.bodyImageHeight && config.bodyImageHeight !== "auto") {
+          const match = config.bodyImageHeight.match(/^([\d.]+)(.*)$/);
+          if (match) {
+            heightVal = parseFloat(match[1]);
+            heightUnit = match[2] || "mm";
+          }
+        } else if (config.bodyImageHeightMm && config.bodyImageHeightMm > 0) {
+          heightVal = config.bodyImageHeightMm;
+          heightUnit = "mm";
+        }
+        setVal("bodyImageHeight", heightVal);
+        setVal("bodyImageHeightUnit", heightUnit);
+
+        setVal("bodyImageMarginMm", config.bodyImageMarginMm !== undefined ? config.bodyImageMarginMm : 4);
+        
+        alert("Modelo carregado com sucesso!");
+      }
+
+      loadTemplateBtn.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        const id = templateSelect.value;
+        if (!id) return alert("Selecione um modelo para carregar.");
+        try {
+          const r = await fetch("/api/templates/" + id);
+          if (!r.ok) throw new Error(await r.text());
+          const t = await r.json();
+          const config = JSON.parse(t.config);
+          applyTemplate(config);
+          templateNameInput.value = t.name;
+        } catch (e) {
+          alert("Erro ao carregar modelo: " + e.message);
+        }
+      });
+
+      saveTemplateBtn.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        const name = templateNameInput.value.trim();
+        if (!name) return alert("Digite um nome para o novo modelo.");
+        const payload = buildPayload("full");
+        delete payload.inputFile;
+        delete payload.outputFile;
+        delete payload.mode;
+        
+        try {
+          const r = await fetch("/api/templates", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, config: payload })
+          });
+          if (!r.ok) throw new Error(await r.text());
+          alert("Modelo salvo com sucesso!");
+          await loadTemplatesList();
+        } catch (e) {
+          alert("Erro ao salvar modelo: " + e.message);
+        }
+      });
+
+      updateTemplateBtn.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        const id = templateSelect.value;
+        if (!id) return alert("Selecione um modelo para atualizar.");
+        const name = templateSelect.options[templateSelect.selectedIndex].text;
+        
+        if (!confirm("Tem certeza que deseja atualizar o modelo '" + name + "' com os dados atuais?")) return;
+
+        const payload = buildPayload("full");
+        delete payload.inputFile;
+        delete payload.outputFile;
+        delete payload.mode;
+        
+        try {
+          const r = await fetch("/api/templates/" + id, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, config: payload })
+          });
+          if (!r.ok) throw new Error(await r.text());
+          alert("Modelo atualizado com sucesso!");
+        } catch (e) {
+          alert("Erro ao atualizar modelo: " + e.message);
+        }
+      });
+
+      deleteTemplateBtn.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        const id = templateSelect.value;
+        if (!id) return alert("Selecione um modelo para excluir.");
+        if (!confirm("Tem certeza que deseja excluir este modelo?")) return;
+        try {
+          const r = await fetch("/api/templates/" + id, { method: "DELETE" });
+          if (!r.ok) throw new Error(await r.text());
+          alert("Modelo excluído com sucesso!");
+          templateNameInput.value = "";
+          await loadTemplatesList();
+        } catch (e) {
+          alert("Erro ao excluir modelo: " + e.message);
+        }
+      });
+
+      loadTemplatesList();
     </script>
   </body>
 </html>
