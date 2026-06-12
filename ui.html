@@ -107,6 +107,23 @@
     </fieldset>
 
     <fieldset>
+      <legend><b>Nomes / Títulos Personalizados</b></legend>
+      <div class="row">
+        <label for="customTitles">Nomes ou Títulos Adicionais (que não estejam no arquivo)</label>
+        <textarea id="customTitles" placeholder="Insira os nomes adicionais, um por linha. Ex:&#10;Nilton José da Silva&#10;Maria de Souza" style="min-height: 100px;"></textarea>
+      </div>
+      <div class="grid">
+        <div class="row">
+          <label for="customTitlesSeparator">Como separar os nomes/títulos</label>
+          <select id="customTitlesSeparator">
+            <option value="newline" selected>Um por linha (para nomes simples)</option>
+            <option value="blank_line">Por linha em branco (para títulos completos com várias linhas)</option>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
       <div class="grid">
         <div class="row">
           <label for="inputFile">Arquivo de entrada</label>
@@ -538,6 +555,8 @@
       const defaultGender = el("defaultGender");
       const forcedFemaleNames = el("forcedFemaleNames");
       const forcedMaleNames = el("forcedMaleNames");
+      const customTitles = el("customTitles");
+      const customTitlesSeparator = el("customTitlesSeparator");
 
       const bodyImageEnabled = el("bodyImageEnabled");
       const bodyImage = el("bodyImage");
@@ -604,15 +623,23 @@
         const r = await fetch("/api/inputs");
         const data = await r.json();
         inputFile.innerHTML = "";
+        
+        const noneOpt = document.createElement("option");
+        noneOpt.value = "";
+        noneOpt.textContent = "-- Nenhum (Usar apenas nomes personalizados) --";
+        inputFile.appendChild(noneOpt);
+
         for (const file of data.files || []) {
           const opt = document.createElement("option");
           opt.value = file;
           opt.textContent = file;
           inputFile.appendChild(opt);
         }
-        const pdfOption = [...inputFile.options].find((o) => o.value.toLowerCase().endsWith(".pdf"));
+        const pdfOption = [...inputFile.options].find((o) => o.value && o.value.toLowerCase().endsWith(".pdf"));
         if (pdfOption) {
           inputFile.value = pdfOption.value;
+        } else {
+          inputFile.value = "";
         }
       }
 
@@ -646,6 +673,22 @@
             .split(/\r?\n/g)
             .map((l) => l.trim())
             .filter(Boolean);
+
+        const parseCustomTitles = () => {
+          const text = customTitles.value || "";
+          const sep = customTitlesSeparator.value;
+          if (sep === "blank_line") {
+            return text
+              .split(/\n\s*\n/g)
+              .map((t) => t.trim())
+              .filter(Boolean);
+          } else {
+            return text
+              .split(/\r?\n/g)
+              .map((t) => t.trim())
+              .filter(Boolean);
+          }
+        };
 
         return {
           mode,
@@ -695,6 +738,8 @@
           defaultGender: defaultGender.value,
           forcedFemaleNames: listFromText(forcedFemaleNames.value),
           forcedMaleNames: listFromText(forcedMaleNames.value),
+          customTitles: parseCustomTitles(),
+          customTitlesSeparator: customTitlesSeparator.value,
           bodyImageEnabled: Boolean(bodyImageEnabled.checked),
           bodyImageDataUrl,
           bodyImageWidth: bodyImageWidth.value && bodyImageWidth.value !== "0" ? bodyImageWidth.value + bodyImageWidthUnit.value : "auto",
@@ -908,6 +953,9 @@
         setVal("defaultGender", config.defaultGender);
         setVal("forcedFemaleNames", (config.forcedFemaleNames || []).join("\n"));
         setVal("forcedMaleNames", (config.forcedMaleNames || []).join("\n"));
+        setVal("customTitlesSeparator", config.customTitlesSeparator || "newline");
+        const separator = config.customTitlesSeparator || "newline";
+        setVal("customTitles", (config.customTitles || []).join(separator === "blank_line" ? "\n\n" : "\n"));
 
         setChk("bodyImageEnabled", config.bodyImageEnabled);
         bodyImageDataUrl = config.bodyImageDataUrl || "";

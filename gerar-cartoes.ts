@@ -128,7 +128,8 @@ function isLikelyTitleWithName(value: string) {
 }
 
 export type GenerateOptions = {
-  inputPath: string;
+  inputPath?: string;
+  customTitles?: string[];
   outputPath: string;
   widthMm: number;
   heightMm: number;
@@ -644,12 +645,19 @@ export async function generatePdf(options: GenerateOptions, onProgress?: (update
       alignY,
     )};`;
 
-  const titles = await extractTitlesFromInput(options.inputPath, (percent, message) => report(percent, message));
+  let titles: string[] = [];
+  if (options.inputPath) {
+    const fileTitles = await extractTitlesFromInput(options.inputPath, (percent, message) => report(percent, message));
+    titles.push(...fileTitles);
+  }
+  if (options.customTitles && options.customTitles.length > 0) {
+    titles.push(...options.customTitles);
+  }
   report(20, "Montar cartões");
   const built = buildCardsFromTitles(titles, options);
 
   if (built.cards.length === 0) {
-    throw new Error("Não encontrar nenhum título com nome no arquivo de entrada.");
+    throw new Error("Nenhum cartão foi gerado. Verifique se o arquivo de entrada ou os nomes personalizados são válidos.");
   }
 
   const sortedCards = [...built.cards].sort((a, b) => {

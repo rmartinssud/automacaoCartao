@@ -12,7 +12,8 @@ import {
 } from "./database.js";
 
 type GenerateRequest = {
-  inputFile: string;
+  inputFile?: string;
+  customTitles?: string[];
   outputFile: string;
   widthMm?: number;
   heightMm?: number;
@@ -97,18 +98,29 @@ async function getGeneratePdf() {
 
 function buildGenerateOptions(rootDir: string, payload: GenerateRequest, modeOverride?: "preview" | "full") {
   if (!payload || typeof payload !== "object") throw new Error("Payload inválido.");
-  const inputLower = payload.inputFile?.toLowerCase?.() ?? "";
-  const isInputAllowed = inputLower.endsWith(".txt") || inputLower.endsWith(".pdf");
-  if (!isSimpleFileName(payload.inputFile) || !isInputAllowed) {
-    throw new Error("Arquivo de entrada inválido.");
+  
+  const hasInputFile = typeof payload.inputFile === "string" && payload.inputFile.trim() !== "";
+  const customTitles = Array.isArray(payload.customTitles) ? payload.customTitles : [];
+
+  if (!hasInputFile && customTitles.length === 0) {
+    throw new Error("É necessário selecionar um arquivo de entrada ou inserir nomes personalizados.");
   }
+
+  if (hasInputFile && payload.inputFile) {
+    const inputLower = payload.inputFile.toLowerCase();
+    const isInputAllowed = inputLower.endsWith(".txt") || inputLower.endsWith(".pdf");
+    if (!isSimpleFileName(payload.inputFile) || !isInputAllowed) {
+      throw new Error("Arquivo de entrada inválido.");
+    }
+  }
+
   if (!isSimpleFileName(payload.outputFile) || !payload.outputFile.toLowerCase().endsWith(".pdf")) {
     console.log("Arquivo de saída inválido:", { outputFile: payload.outputFile, isSimple: isSimpleFileName(payload.outputFile), endsWith: payload.outputFile?.toLowerCase().endsWith(".pdf") });
     throw new Error(`Arquivo de saída inválido. Nome recebido: "${payload.outputFile}"`);
   }
 
-  const inputPath = path.resolve(rootDir, payload.inputFile);
-  if (!fs.existsSync(inputPath)) throw new Error("Arquivo de entrada não existir.");
+  const inputPath = (hasInputFile && payload.inputFile) ? path.resolve(rootDir, payload.inputFile) : "";
+  if (hasInputFile && !fs.existsSync(inputPath)) throw new Error("Arquivo de entrada não existir.");
 
   const preset = payload.preset ?? "cartao";
   const widthMm = payload.widthMm ?? (preset === "a4" ? 210 : 156);
@@ -236,6 +248,7 @@ function buildGenerateOptions(rootDir: string, payload: GenerateRequest, modeOve
 
   const options: GenerateOptions = {
     inputPath,
+    customTitles,
     outputPath,
     widthMm,
     heightMm,
